@@ -265,6 +265,7 @@ Task<vector<ImageData>> ExrImageLoader::load(istream& iStream, const fs::path& p
         part.readPixels(dataWindow.min.y, dataWindow.max.y);
 
         data.hasPremultipliedAlpha = true;
+        data.format = "Exr";
         if (part.header().hasName()) {
             data.partName = part.header().name();
         }

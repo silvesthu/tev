@@ -56,6 +56,7 @@ Task<vector<ImageData>> EmptyImageLoader::load(istream& iStream, const fs::path&
     }
 
     data.hasPremultipliedAlpha = true;
+    data.format = "Empty";
 
     co_return result;
 }

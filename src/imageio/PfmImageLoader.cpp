@@ -93,6 +93,7 @@ Task<vector<ImageData>> PfmImageLoader::load(istream& iStream, const fs::path&, 
     }, priority);
 
     resultData.hasPremultipliedAlpha = false;
+    resultData.format = "Pfm";
 
     co_return result;
 }

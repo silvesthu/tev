@@ -17,7 +17,7 @@ bool StbiImageLoader::canLoadFile(istream&) const {
     return true;
 }
 
-Task<vector<ImageData>> StbiImageLoader::load(istream& iStream, const fs::path&, const string& channelSelector, int priority) const {
+Task<vector<ImageData>> StbiImageLoader::load(istream& iStream, const fs::path& path, const string& channelSelector, int priority) const {
     vector<ImageData> result(1);
     ImageData& resultData = result.front();
 
@@ -42,6 +42,10 @@ Task<vector<ImageData>> StbiImageLoader::load(istream& iStream, const fs::path&,
     int numChannels;
     Vector2i size;
     bool isHdr = stbi_is_hdr_from_callbacks(&callbacks, &iStream) != 0;
+    iStream.clear();
+    iStream.seekg(0);
+
+    bool is16bit = stbi_is_16_bit_from_callbacks(&callbacks, &iStream) != 0;
     iStream.clear();
     iStream.seekg(0);
 
@@ -88,6 +92,7 @@ Task<vector<ImageData>> StbiImageLoader::load(istream& iStream, const fs::path&,
     }
 
     resultData.hasPremultipliedAlpha = false;
+    resultData.format = path.extension().string().substr(1) + " " + (is16bit ? "16bit" : "8bit");
 
     co_return result;
 }

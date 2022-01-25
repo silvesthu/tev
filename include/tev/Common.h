@@ -300,6 +300,18 @@ enum EMetric : int {
 
 EMetric toMetric(std::string name);
 
+enum EChannel : int {
+    ChannelNone = 0,
+    ChannelR = 1,
+    ChannelG = 2,
+    ChannelB = 4,
+    ChannelA = 8,
+
+    ChannelRGB = ChannelR | ChannelG | ChannelB,
+    ChannelRGBA = ChannelR | ChannelG | ChannelB | ChannelA,
+    ChannelCount = 4,
+};
+
 enum EDirection {
     Forward,
     Backward,

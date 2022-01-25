@@ -4,6 +4,8 @@
 #include <tev/imageio/DdsImageLoader.h>
 #include <tev/ThreadPool.h>
 
+#include <nameof.hpp>
+
 #include <DirectXTex.h>
 
 using namespace nanogui;
@@ -247,6 +249,7 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
     }
 
     resultData.hasPremultipliedAlpha = scratchImage.GetMetadata().IsPMAlpha();
+    resultData.format = NAMEOF_ENUM(metadata.format);
 
     co_return result;
 }

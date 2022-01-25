@@ -27,6 +27,7 @@ struct ImageData {
     ImageData(const ImageData&) = delete;
     ImageData(ImageData&&) = default;
 
+    std::string format;
     std::vector<Channel> channels;
     std::vector<std::string> layers;
     nanogui::Matrix4f toRec709 = nanogui::Matrix4f{1.0f}; // Identity by default
@@ -130,6 +131,10 @@ public:
     }
 
     std::string shortName() const;
+
+    std::string format() const {
+        return mData.format;
+    }
 
     bool hasChannel(const std::string& channelName) const {
         return mData.hasChannel(channelName);

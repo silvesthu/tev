@@ -511,7 +511,11 @@ string Image::toString() const {
         }
     });
 
-    sstream << join(localLayers, "\n");
+    sstream << join(localLayers, "\n") << "\n";
+
+    sstream << "\nFormat:\n";
+    sstream << mData.format << "\n";
+
     return sstream.str();
 }
 

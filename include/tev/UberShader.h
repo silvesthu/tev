@@ -27,7 +27,8 @@ public:
         float offset,
         float gamma,
         bool clipToLdr,
-        ETonemap tonemap
+        ETonemap tonemap,
+        EChannel channel
     );
 
     // Draws a difference between a reference and an image.
@@ -43,7 +44,8 @@ public:
         float gamma,
         bool clipToLdr,
         ETonemap tonemap,
-        EMetric metric
+        EMetric metric,
+        EChannel channel
     );
 
     const nanogui::Color& backgroundColor() {
@@ -69,7 +71,8 @@ private:
     void bindReferenceData(
         nanogui::Texture* textureReference,
         const nanogui::Matrix3f& transformReference,
-        EMetric metric
+        EMetric metric,
+        EChannel channel
     );
 
     nanogui::ref<nanogui::Shader> mShader;

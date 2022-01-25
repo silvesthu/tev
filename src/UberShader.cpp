@@ -72,6 +72,7 @@ UberShader::UberShader(RenderPass* renderPass) {
             uniform bool clipToLdr;
             uniform int tonemap;
             uniform int metric;
+            uniform int channel;
 
             uniform vec4 bgColor;
 
@@ -145,6 +146,43 @@ UberShader::UberShader(RenderPass* renderPass) {
                 return vec3(0.0);
             }
 
+            vec4 applyChannel(vec4 col)
+            {
+                // not bit shift support in #version 110
+                if (channel == 0)
+                    return vec4(0.0, 0.0, 0.0, 1.0);
+                else if (channel == 1)
+                    return vec4(col.r, 0.0, 0.0, 1.0);
+                else if (channel == 2)
+                    return vec4(col.g, 0.0, 0.0, 1.0);
+                else if (channel == 3)
+                    return vec4(col.r, col.g, 0.0, 1.0);
+                else if (channel == 4)
+                    return vec4(col.b, 0.0, 0.0, 1.0);
+                else if (channel == 5)
+                    return vec4(col.r, col.b, 0.0, 1.0);
+                else if (channel == 6)
+                    return vec4(col.g, col.b, 0.0, 1.0);
+                else if (channel == 7)
+                    return vec4(col.r, col.g, col.b, 1.0);
+                else if (channel == 8)
+                    return vec4(col.a, 0.0, 0.0, 1.0);
+                else if (channel == 9)
+                    return vec4(col.r, col.a, 0.0, 1.0);
+                else if (channel == 10)
+                    return vec4(col.g, col.a, 0.0, 1.0);
+                else if (channel == 11)
+                    return vec4(col.r, col.g, col.a, 1.0);
+                else if (channel == 12)
+                    return vec4(col.b, col.a, 0.0, 1.0);
+                else if (channel == 13)
+                    return vec4(col.r, col.b, col.a, 1.0);
+                else if (channel == 14)
+                    return vec4(col.g, col.b, col.a, 1.0);
+                else if (channel == 15)
+                    return vec4(col.r, col.g, col.b, col.a);
+            }
+
             vec4 sample(sampler2D sampler, vec2 uv) {
                 vec4 color = texture2D(sampler, uv);
                 if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
@@ -165,6 +203,7 @@ UberShader::UberShader(RenderPass* renderPass) {
                 }
 
                 vec4 imageVal = sample(image, imageUv);
+                imageVal = applyChannel(imageVal);
                 if (!hasReference) {
                     gl_FragColor = vec4(
                         applyTonemap(applyExposureAndOffset(imageVal.rgb), vec4(checker, 1.0 - imageVal.a)),
@@ -175,6 +214,7 @@ UberShader::UberShader(RenderPass* renderPass) {
                 }
 
                 vec4 referenceVal = sample(reference, referenceUv);
+                referenceVal = applyChannel(referenceVal);
 
                 vec3 difference = imageVal.rgb - referenceVal.rgb;
                 float alpha = (imageVal.a + referenceVal.a) * 0.5;
@@ -411,7 +451,7 @@ void UberShader::draw(const Vector2f& pixelSize, const Vector2f& checkerSize) {
         pixelSize, checkerSize,
         nullptr, Matrix3f{0.0f},
         0.0f, 0.0f, 0.0f, false,
-        ETonemap::SRGB
+        ETonemap::SRGB, EChannel::ChannelRGBA
     );
 }
 
@@ -424,14 +464,15 @@ void UberShader::draw(
     float offset,
     float gamma,
     bool clipToLdr,
-    ETonemap tonemap
+    ETonemap tonemap,
+    EChannel channel
 ) {
     draw(
         pixelSize, checkerSize,
         textureImage, transformImage,
         nullptr, Matrix3f{0.0f},
         exposure, offset, gamma, clipToLdr,
-        tonemap, EMetric::Error
+        tonemap, EMetric::Error, channel
     );
 }
 
@@ -447,7 +488,8 @@ void UberShader::draw(
     float gamma,
     bool clipToLdr,
     ETonemap tonemap,
-    EMetric metric
+    EMetric metric,
+    EChannel channel
 ) {
     bool hasImage = textureImage;
     if (!hasImage) {
@@ -463,7 +505,7 @@ void UberShader::draw(
 
     bindCheckerboardData(pixelSize, checkerSize);
     bindImageData(textureImage, transformImage, exposure, offset, gamma, tonemap);
-    bindReferenceData(textureReference, transformReference, metric);
+    bindReferenceData(textureReference, transformReference, metric, channel);
     mShader->set_uniform("hasImage", hasImage);
     mShader->set_uniform("hasReference", hasReference);
     mShader->set_uniform("clipToLdr", clipToLdr);
@@ -502,13 +544,16 @@ void UberShader::bindImageData(
 void UberShader::bindReferenceData(
     Texture* textureReference,
     const Matrix3f& transformReference,
-    EMetric metric
+    EMetric metric,
+    EChannel channel
 ) {
     mShader->set_texture("reference", textureReference);
     mShader->set_uniform("referenceScale", Vector2f{transformReference.m[0][0], transformReference.m[1][1]});
     mShader->set_uniform("referenceOffset", Vector2f{transformReference.m[2][0], transformReference.m[2][1]});
 
     mShader->set_uniform("metric", static_cast<int>(metric));
+
+    mShader->set_uniform("channel", static_cast<int>(channel));
 }
 
 TEV_NAMESPACE_END
