@@ -10,27 +10,19 @@ on:
 jobs:
   build_windows:
     name: Build on Windows
-    runs-on: windows-latest
-
+    runs-on: windows-2022
+    env:
+      build_dir: "build"
+      config: "Release"
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: recursive
-
-      - name: Fetch newer Windows SDK
-        uses: fbactions/setup-winsdk@v1
-        with:
-          winsdk-build-version: 19631
-
-      - name: Setup MSBuild.exe
-        uses: microsoft/setup-msbuild@v1.1
-
       - name: CMake
-        run: cmake -DCMAKE_SYSTEM_VERSION=10.0.19631.0 .
-        
+        run: cmake . -B ${{ env.build_dir }}
       - name: Build
-        run: msbuild /v:m /p:Configuration=Release tev.sln
-        
+        working-directory: ${{ env.build_dir }}
+        run: cmake --build . --config ${{ env.config }} --target ALL_BUILD --verbose        
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
