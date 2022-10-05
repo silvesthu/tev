@@ -181,13 +181,13 @@ Task<void> ImageData::ensureValid(const string& channelSelector, int taskPriorit
         }
     }
 
-    if (!hasPremultipliedAlpha) {
-        co_await multiplyAlpha(taskPriority);
-    }
+    //if (!hasPremultipliedAlpha) {
+    //    co_await multiplyAlpha(taskPriority);
+    //}
 
     co_await convertToRec709(taskPriority);
 
-    TEV_ASSERT(hasPremultipliedAlpha, "tev assumes an internal pre-multiplied-alpha representation.");
+    // TEV_ASSERT(hasPremultipliedAlpha, "tev assumes an internal pre-multiplied-alpha representation.");
     TEV_ASSERT(toRec709 == Matrix4f{1.0f}, "tev assumes an images to be internally represented in sRGB/Rec709 space.");
 }
 

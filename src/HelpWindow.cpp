@@ -152,7 +152,7 @@ HelpWindow::HelpWindow(Widget *parent, bool supportsHdr, function<void()> closeC
 
         addSpacer(about, 15);
 
-        addText(about, "tev — The EXR Viewer", "sans-bold", 46);
+        addText(about, "tev - The EXR Viewer", "sans-bold", 46);
         addText(about, "version " TEV_VERSION, "sans", 26);
 
         addSpacer(about, 50);

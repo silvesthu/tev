@@ -250,6 +250,7 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
 
     resultData.hasPremultipliedAlpha = scratchImage.GetMetadata().IsPMAlpha();
     resultData.format = NAMEOF_ENUM(metadata.format);
+    resultData.sRGB = DirectX::IsSRGB(metadata.format);
 
     co_return result;
 }
