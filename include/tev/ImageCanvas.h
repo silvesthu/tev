@@ -95,6 +95,14 @@ public:
         mMetric = metric;
     }
 
+    EChannel channel() const {
+        return mChannel;
+    }
+
+    void setChannel(EChannel channel) {
+        mChannel = channel;
+    }
+
     static float applyMetric(float value, float reference, EMetric metric);
     float applyMetric(float value, float reference) const {
         return applyMetric(value, reference, mMetric);
@@ -175,6 +183,7 @@ private:
 
     ETonemap mTonemap = SRGB;
     EMetric mMetric = Error;
+    EChannel mChannel = ChannelRGB;
 
     std::map<std::string, std::shared_ptr<Lazy<std::shared_ptr<CanvasStatistics>>>> mCanvasStatistics;
     std::map<int, std::vector<std::string>> mImageIdToCanvasStatisticsKey;

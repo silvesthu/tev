@@ -72,7 +72,8 @@ void ImageCanvas::draw_contents() {
             mOffset,
             mGamma,
             mClipToLdr,
-            mTonemap
+            mTonemap,
+            mChannel
         );
         return;
     }
@@ -91,7 +92,8 @@ void ImageCanvas::draw_contents() {
         mGamma,
         mClipToLdr,
         mTonemap,
-        mMetric
+        mMetric,
+        mChannel
     );
 }
 

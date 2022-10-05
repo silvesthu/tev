@@ -213,6 +213,7 @@ include_directories(
     ${STB_INCLUDE}
     ${TINYLOGGER_INCLUDE}
     ${UTFCPP_INCLUDE}
+    ${NAMEOF_INCLUDE}
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 

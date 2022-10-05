@@ -1,0 +1,45 @@
+name: build_windows
+
+on:
+  workflow_dispatch:
+  push:
+  # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+jobs:
+  build_windows:
+    name: Build on Windows
+    runs-on: windows-2022
+    env:
+      build_dir: "build"
+      config: "Release"
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: recursive
+      - name: CMake
+        run: cmake . -B ${{ env.build_dir }}
+      - name: Build
+        working-directory: ${{ env.build_dir }}
+        run: cmake --build . --config ${{ env.config }} --target ALL_BUILD --verbose        
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: ./Build/Release/tev.exe
+          asset_name: tev.exe
+          asset_content_type: application/vnd.microsoft.portable-executable

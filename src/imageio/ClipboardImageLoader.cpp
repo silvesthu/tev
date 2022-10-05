@@ -100,6 +100,7 @@ Task<vector<ImageData>> ClipboardImageLoader::load(istream& iStream, const fs::p
     }, priority);
 
     resultData.hasPremultipliedAlpha = false;
+    resultData.format = "Clipboard";
 
     co_return result;
 }
