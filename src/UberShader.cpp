@@ -73,6 +73,7 @@ UberShader::UberShader(RenderPass* renderPass) {
             uniform int tonemap;
             uniform int metric;
             uniform int channel;
+            uniform vec2 minmax;
 
             uniform vec4 bgColor;
 
@@ -204,6 +205,7 @@ UberShader::UberShader(RenderPass* renderPass) {
 
                 vec4 imageVal = sample(image, imageUv);
                 imageVal = applyChannel(imageVal);
+                imageVal.xyz = (imageVal.xyz - minmax.x) / (minmax.y - minmax.x);
                 if (!hasReference) {
                     gl_FragColor = vec4(
                         applyTonemap(applyExposureAndOffset(imageVal.rgb), vec4(checker, 1.0 - imageVal.a)),
@@ -451,7 +453,7 @@ void UberShader::draw(const Vector2f& pixelSize, const Vector2f& checkerSize) {
         pixelSize, checkerSize,
         nullptr, Matrix3f{0.0f},
         0.0f, 0.0f, 0.0f, false,
-        ETonemap::SRGB, EChannel::ChannelRGBA
+        ETonemap::SRGB, EChannel::ChannelRGBA, {0, 1}
     );
 }
 
@@ -465,14 +467,15 @@ void UberShader::draw(
     float gamma,
     bool clipToLdr,
     ETonemap tonemap,
-    EChannel channel
+    EChannel channel,
+    const Vector2f& minmax
 ) {
     draw(
         pixelSize, checkerSize,
         textureImage, transformImage,
         nullptr, Matrix3f{0.0f},
         exposure, offset, gamma, clipToLdr,
-        tonemap, EMetric::Error, channel
+        tonemap, EMetric::Error, channel, minmax
     );
 }
 
@@ -489,7 +492,8 @@ void UberShader::draw(
     bool clipToLdr,
     ETonemap tonemap,
     EMetric metric,
-    EChannel channel
+    EChannel channel,
+    const Vector2f& minmax
 ) {
     bool hasImage = textureImage;
     if (!hasImage) {
@@ -505,7 +509,7 @@ void UberShader::draw(
 
     bindCheckerboardData(pixelSize, checkerSize);
     bindImageData(textureImage, transformImage, exposure, offset, gamma, tonemap);
-    bindReferenceData(textureReference, transformReference, metric, channel);
+    bindReferenceData(textureReference, transformReference, metric, channel, minmax);
     mShader->set_uniform("hasImage", hasImage);
     mShader->set_uniform("hasReference", hasReference);
     mShader->set_uniform("clipToLdr", clipToLdr);
@@ -545,7 +549,8 @@ void UberShader::bindReferenceData(
     Texture* textureReference,
     const Matrix3f& transformReference,
     EMetric metric,
-    EChannel channel
+    EChannel channel,
+    const Vector2f& minmax
 ) {
     mShader->set_texture("reference", textureReference);
     mShader->set_uniform("referenceScale", Vector2f{transformReference.m[0][0], transformReference.m[1][1]});
@@ -554,6 +559,7 @@ void UberShader::bindReferenceData(
     mShader->set_uniform("metric", static_cast<int>(metric));
 
     mShader->set_uniform("channel", static_cast<int>(channel));
+    mShader->set_uniform("minmax", minmax);
 }
 
 TEV_NAMESPACE_END

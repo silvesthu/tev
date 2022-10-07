@@ -294,6 +294,52 @@ ImageViewer::ImageViewer(const shared_ptr<BackgroundImagesLoader>& imagesLoader,
             mHistogram = new MultiGraph{panel, ""};
         }
 
+        // Min, Max
+        {
+            panel = new Widget{ mSidebarLayout };
+            panel->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+
+            auto min_float_box = new FloatBox<float>(panel);
+            min_float_box->set_editable(true);
+            min_float_box->set_callback([this](float value) {
+                mImageCanvas->setMinMax({ value, mImageCanvas->MinMax().y()});
+            });
+
+            auto max_float_box = new FloatBox<float>(panel);
+            max_float_box->set_editable(true);
+            max_float_box->set_callback([this](float value) {
+                mImageCanvas->setMinMax({ mImageCanvas->MinMax().x(), value});
+            });
+
+            auto fit = [=] {
+                auto stat = mImageCanvas->canvasStatistics();
+                if (stat == nullptr || !stat->isReady())
+                    return;
+                
+                min_float_box->set_value(stat->get()->minimum);
+                max_float_box->set_value(stat->get()->maximum);
+                mImageCanvas->setMinMax({ min_float_box->value(), max_float_box->value() });
+            };
+
+            auto reset = [=] {
+                min_float_box->set_value(0);
+                max_float_box->set_value(1);
+                mImageCanvas->setMinMax({ min_float_box->value(), max_float_box->value() });
+            };
+            reset();
+
+            panel = new Widget{ mSidebarLayout };
+            panel->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+
+            auto button = new Button{ panel, "Fit Range" };
+            button->set_font_size(15);
+            button->set_callback(fit);
+
+            button = new Button{ panel, "Reset [0,1]" };
+            button->set_font_size(15);
+            button->set_callback(reset);
+        }
+
         // Channels
         {
             mChannelButtonContainer = new Widget{ mSidebarLayout };

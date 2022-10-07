@@ -73,7 +73,8 @@ void ImageCanvas::draw_contents() {
             mGamma,
             mClipToLdr,
             mTonemap,
-            mChannel
+            mChannel,
+            mMinMax
         );
         return;
     }
@@ -93,7 +94,8 @@ void ImageCanvas::draw_contents() {
         mClipToLdr,
         mTonemap,
         mMetric,
-        mChannel
+        mChannel,
+        mMinMax
     );
 }
 

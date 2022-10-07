@@ -212,8 +212,6 @@ private:
 
     nanogui::Widget* mTonemapButtonContainer;
     nanogui::Widget* mMetricButtonContainer;
-    nanogui::Widget* mChannelButtonContainer;
-    nanogui::Widget* mChannelResetButtonContainer;
 
     std::shared_ptr<BackgroundImagesLoader> mImagesLoader;
 
@@ -224,6 +222,9 @@ private:
 
     MultiGraph* mHistogram;
     std::set<std::shared_ptr<Image>> mToBump;
+
+    nanogui::Widget* mChannelButtonContainer;
+    nanogui::Widget* mChannelResetButtonContainer;
 
     nanogui::TextBox* mFilter;
     nanogui::Button* mRegexButton;

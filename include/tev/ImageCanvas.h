@@ -103,6 +103,14 @@ public:
         mChannel = channel;
     }
 
+    const nanogui::Vector2f& MinMax() const {
+        return mMinMax;
+    }
+
+    void setMinMax(const nanogui::Vector2f& min_max) {
+        mMinMax = min_max;
+    }
+
     static float applyMetric(float value, float reference, EMetric metric);
     float applyMetric(float value, float reference) const {
         return applyMetric(value, reference, mMetric);
@@ -184,6 +192,7 @@ private:
     ETonemap mTonemap = SRGB;
     EMetric mMetric = Error;
     EChannel mChannel = ChannelRGB;
+    nanogui::Vector2f mMinMax = { 0, 1 };
 
     std::map<std::string, std::shared_ptr<Lazy<std::shared_ptr<CanvasStatistics>>>> mCanvasStatistics;
     std::map<int, std::vector<std::string>> mImageIdToCanvasStatisticsKey;
