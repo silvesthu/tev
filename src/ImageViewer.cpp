@@ -77,7 +77,7 @@ ImageViewer::ImageViewer(const shared_ptr<BackgroundImagesLoader>& imagesLoader,
             mExposureLabel = new Label{panel, "", "sans-bold", 15};
 
             mExposureSlider = new Slider{panel};
-            mExposureSlider->set_range({-5.0f, 5.0f});
+            mExposureSlider->set_range({-10.0f, 10.0f});
             mExposureSlider->set_callback([this](float value) {
                 setExposure(value);
             });
