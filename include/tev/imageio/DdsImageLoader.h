@@ -12,6 +12,9 @@ TEV_NAMESPACE_BEGIN
 
 class DdsImageLoader : public ImageLoader {
 public:
+    DdsImageLoader();
+    ~DdsImageLoader();
+
     bool canLoadFile(std::istream& iStream) const override;
     Task<std::vector<ImageData>> load(std::istream& iStream, const fs::path& path, const std::string& channelSelector, int priority) const override;
 
