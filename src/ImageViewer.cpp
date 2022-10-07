@@ -272,41 +272,6 @@ ImageViewer::ImageViewer(const shared_ptr<BackgroundImagesLoader>& imagesLoader,
         );
     }
 
-    // Channels
-    {
-        mChannelButtonContainer = new Widget{ mSidebarLayout };
-        mChannelButtonContainer->set_layout(new GridLayout{ Orientation::Horizontal, 4, Alignment::Fill, 5, 2 });
-
-        auto makeChannelButton = [&](const string& name, function<void(bool)> callback) {
-            auto button = new Button{ mChannelButtonContainer, name };
-            button->set_flags(Button::Flags::ToggleButton);
-            button->set_font_size(15);
-            button->set_change_callback(callback);
-            return button;
-        };
-
-        makeChannelButton("R", [this](bool) { setChannel(EChannel::ChannelR, false); });
-        makeChannelButton("G", [this](bool) { setChannel(EChannel::ChannelG, false); });
-        makeChannelButton("B", [this](bool) { setChannel(EChannel::ChannelB, false); });
-        makeChannelButton("A", [this](bool) { setChannel(EChannel::ChannelA, false); });
-
-        mChannelResetButtonContainer = new Widget{ mSidebarLayout };
-        mChannelResetButtonContainer->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
-
-        auto makeChannelResetButton = [&](const string& name, function<void()> callback) {
-            auto button = new Button{ mChannelResetButtonContainer, name };
-            button->set_flags(Button::Flags::NormalButton);
-            button->set_font_size(15);
-            button->set_callback(callback);
-            return button;
-        };
-
-        makeChannelResetButton("RGB", [this]() { setChannel(EChannel::ChannelRGB, true); });
-        makeChannelResetButton("RGBA", [this]() { setChannel(EChannel::ChannelRGBA, true); });
-
-        setChannel(EChannel::ChannelRGBA, true);
-    }
-
     // Image selection
     {
         auto spacer = new Widget{mSidebarLayout};
@@ -327,6 +292,41 @@ ImageViewer::ImageViewer(const shared_ptr<BackgroundImagesLoader>& imagesLoader,
             panel->set_layout(new BoxLayout{Orientation::Vertical, Alignment::Fill, 5});
 
             mHistogram = new MultiGraph{panel, ""};
+        }
+
+        // Channels
+        {
+            mChannelButtonContainer = new Widget{ mSidebarLayout };
+            mChannelButtonContainer->set_layout(new GridLayout{ Orientation::Horizontal, 4, Alignment::Fill, 5, 2 });
+
+            auto makeChannelButton = [&](const string& name, function<void(bool)> callback) {
+                auto button = new Button{ mChannelButtonContainer, name };
+                button->set_flags(Button::Flags::ToggleButton);
+                button->set_font_size(15);
+                button->set_change_callback(callback);
+                return button;
+            };
+
+            makeChannelButton("R", [this](bool) { setChannel(EChannel::ChannelR, false); });
+            makeChannelButton("G", [this](bool) { setChannel(EChannel::ChannelG, false); });
+            makeChannelButton("B", [this](bool) { setChannel(EChannel::ChannelB, false); });
+            makeChannelButton("A", [this](bool) { setChannel(EChannel::ChannelA, false); });
+
+            mChannelResetButtonContainer = new Widget{ mSidebarLayout };
+            mChannelResetButtonContainer->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+
+            auto makeChannelResetButton = [&](const string& name, function<void()> callback) {
+                auto button = new Button{ mChannelResetButtonContainer, name };
+                button->set_flags(Button::Flags::NormalButton);
+                button->set_font_size(15);
+                button->set_callback(callback);
+                return button;
+            };
+
+            makeChannelResetButton("RGB", [this]() { setChannel(EChannel::ChannelRGB, true); });
+            makeChannelResetButton("RGBA", [this]() { setChannel(EChannel::ChannelRGBA, true); });
+
+            setChannel(EChannel::ChannelRGBA, true);
         }
 
         // Fuzzy filter of open images
