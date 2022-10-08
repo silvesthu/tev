@@ -21,7 +21,7 @@
 	url = https://github.com/microsoft/DirectXTex.git
 [submodule "dependencies/nanogui"]
 	path = dependencies/nanogui
-	url = https://github.com/Tom94/nanogui-1
+	url = https://github.com/silvesthu/nanogui-1
 [submodule "dependencies/qoi"]
 	path = dependencies/qoi
 	url = https://github.com/phoboslab/qoi.git
