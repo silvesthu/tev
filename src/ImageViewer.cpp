@@ -1959,12 +1959,12 @@ void ImageViewer::updateTitle() {
 
         string valuesString;
         for (size_t i = 0; i < channelTails.size(); ++i) {
-            valuesString += fmt::format("{:.2f},", values[i]);
+            valuesString += fmt::format("{:.8f},", values[i]);
         }
         valuesString.pop_back();
         valuesString += " / 0x";
         for (size_t i = 0; i < channelTails.size(); ++i) {
-            float tonemappedValue = (!mCurrentImage->sRGB() || channelTails[i] == "A") ? values[i] : toSRGB(values[i]);
+            float tonemappedValue = values[i];
             unsigned char discretizedValue = (char)(tonemappedValue * 255 + 0.5f);
             valuesString += fmt::format("{:02X}", discretizedValue);
         }

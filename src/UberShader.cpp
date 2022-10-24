@@ -186,6 +186,8 @@ UberShader::UberShader(RenderPass* renderPass) {
 
             vec4 sample(sampler2D sampler, vec2 uv) {
                 vec4 color = texture2D(sampler, uv);
+                color = applyChannel(color);
+                color.xyz = (color.xyz - minmax.x) / (minmax.y - minmax.x);
                 if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
                     color = vec4(0.0);
                 }
@@ -204,8 +206,6 @@ UberShader::UberShader(RenderPass* renderPass) {
                 }
 
                 vec4 imageVal = sample(image, imageUv);
-                imageVal = applyChannel(imageVal);
-                imageVal.xyz = (imageVal.xyz - minmax.x) / (minmax.y - minmax.x);
                 if (!hasReference) {
                     gl_FragColor = vec4(
                         applyTonemap(applyExposureAndOffset(imageVal.rgb), vec4(checker, 1.0 - imageVal.a)),

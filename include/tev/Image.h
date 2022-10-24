@@ -32,7 +32,9 @@ struct ImageData {
     std::vector<std::string> layers;
     nanogui::Matrix4f toRec709 = nanogui::Matrix4f{1.0f}; // Identity by default
     bool hasPremultipliedAlpha;
-    bool sRGB = true; // Tev use sRGB by default
+
+    using Surface = std::vector<Channel>;
+    std::vector<Surface> surfaces;
 
     Box2i dataWindow;
     Box2i displayWindow;
@@ -133,9 +135,6 @@ public:
 
     std::string shortName() const;
 
-    bool sRGB() const {
-        return mData.sRGB;
-    }
 
     std::string format() const {
         return mData.format;

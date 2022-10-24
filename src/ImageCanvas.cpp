@@ -159,7 +159,7 @@ void ImageCanvas::drawPixelValuesAsText(NVGcontext* ctx) {
                     Vector2f pos;
 
                     if (shiftAndControlHeld) {
-                        float tonemappedValue = Channel::tail(channels[i]) == "A" ? values[i] : toSRGB(values[i]);
+                        float tonemappedValue = values[i];
                         unsigned char discretizedValue = (char)(tonemappedValue * 255 + 0.5f);
                         str = fmt::format("{:02X}", discretizedValue);
 

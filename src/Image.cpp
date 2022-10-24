@@ -274,10 +274,11 @@ Texture* Image::texture(const vector<string>& channelNames) {
                 throw invalid_argument{fmt::format("Cannot obtain texture of {}:{}, because the channel does not exist.", path(), channelName)};
             }
 
+            bool is_alpha = channelName == "A";
             const auto& channelData = chan->data();
             tasks.emplace_back(
-                ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&channelData, &data, i](size_t j) {
-                    data[j * 4 + i] = channelData[j];
+                ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&channelData, &data, is_alpha, i](size_t j) {
+                    data[j * 4 + i] = is_alpha ? channelData[j] : toLinear(channelData[j]); // to cancel toSRGB on sampling (not sure why glsl treat input of R32G32B32A32_FLOAT as sRGB)
                 }, std::numeric_limits<int>::max())
             );
         } else {

@@ -225,39 +225,17 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
         throw invalid_argument{"DDS image has zero pixels."};
     }
 
-    bool isFloat = DirectX::FormatDataType(metadata.format) == DirectX::FORMAT_TYPE_FLOAT;
-
-    if (isFloat || numChannels < 3) {
-        assert(!DirectX::IsSRGB(metadata.format));
-        // Assume that the image data is already in linear space.
-        auto typedData = reinterpret_cast<float*>(scratchImage.GetPixels());
-        co_await ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&](size_t i) {
-            size_t baseIdx = i * numChannels;
-            for (int c = 0; c < numChannels; ++c) {
-                resultData.channels[c].at(i) = typedData[baseIdx + c];
-            }
-        }, priority);
-    } else {
-        // Ideally, we'd be able to assume that only *_SRGB format images were in
-        // sRGB space, and only they need to converted to linear. However,
-        // RGB(A) DDS images tend to be in sRGB space, even those not
-        // explicitly stored in an *_SRGB format.
-        auto typedData = reinterpret_cast<float*>(scratchImage.GetPixels());
-        co_await ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&](size_t i) {
-            size_t baseIdx = i * numChannels;
-            for (int c = 0; c < numChannels; ++c) {
-                if (c == 3) {
-                    resultData.channels[c].at(i) = typedData[baseIdx + c];
-                } else {
-                    resultData.channels[c].at(i) = toLinear(typedData[baseIdx + c]);
-                }
-            }
-        }, priority);
-    }
+    // Read the data as it is
+    auto typedData = reinterpret_cast<float*>(scratchImage.GetPixels());
+    co_await ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&](size_t i) {
+        size_t baseIdx = i * numChannels;
+        for (int c = 0; c < numChannels; ++c) {
+            resultData.channels[c].at(i) = typedData[baseIdx + c];
+        }
+    }, priority);
 
     resultData.hasPremultipliedAlpha = scratchImage.GetMetadata().IsPMAlpha();
     resultData.format = NAMEOF_ENUM(metadata.format);
-    resultData.sRGB = DirectX::IsSRGB(metadata.format);
 
     co_return result;
 }
