@@ -73,6 +73,9 @@ void ImageCanvas::draw_contents() {
             mGamma,
             mClipToLdr,
             mTonemap
+
+            , mChannel
+            , mMinMax
         );
         return;
     }
@@ -94,6 +97,9 @@ void ImageCanvas::draw_contents() {
         mClipToLdr,
         mTonemap,
         mMetric
+
+        , mChannel
+        , mMinMax
     );
 }
 
@@ -157,7 +163,11 @@ void ImageCanvas::drawPixelValuesAsText(NVGcontext* ctx) {
                     Vector2f pos;
 
                     if (shiftAndControlHeld) {
+#if 0 // [DDS]
                         float tonemappedValue = Channel::tail(channels[i]) == "A" ? values[i] : toSRGB(values[i]);
+#else
+                        float tonemappedValue = values[i];
+#endif // [DDS]
                         unsigned char discretizedValue = (char)(tonemappedValue * 255 + 0.5f);
                         str = fmt::format("{:02X}", discretizedValue);
 
@@ -166,7 +176,11 @@ void ImageCanvas::drawPixelValuesAsText(NVGcontext* ctx) {
                             (float)m_pos.y() + nano.y(),
                         };
                     } else {
+#if 0 // [DDS]
                         str = std::abs(values[i]) > 100000 ? fmt::format("{:6g}", values[i]) : fmt::format("{:.5f}", values[i]);
+#else
+                        str = fmt::format("{:.8f}", values[i]);
+#endif // [DDS]
 
                         pos = Vector2f{
                             (float)m_pos.x() + nano.x(),

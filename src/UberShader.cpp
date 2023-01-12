@@ -117,6 +117,8 @@ UberShader::UberShader(RenderPass* renderPass) {
             }
 
             vec3 applyTonemap(vec3 col, vec4 background) {
+
+#if 0 // [DDS]
                 if (tonemap == SRGB) {
                     col = col +
                         (vec3(linear(background.r), linear(background.g), linear(background.b)) - offset) * background.a;
@@ -124,6 +126,25 @@ UberShader::UberShader(RenderPass* renderPass) {
                 } else if (tonemap == GAMMA) {
                     col = col + (pow(background.rgb, vec3(gamma)) - offset) * background.a;
                     return sign(col) * pow(abs(col), vec3(1.0 / gamma));
+#else
+                if (tonemap == SRGB) {
+
+                    // Frame buffer is in sRGB, output process is kind of sRGB -> Linear
+                    // Skip conversion to view the value as sRGB, 
+
+                    col = col + (vec3((background.r), (background.g), (background.b)) - offset) * background.a;                    
+                    return vec3((col.r), (col.g), (col.b));
+
+                } else if (tonemap == GAMMA) {
+
+                    // Frame buffer is in sRGB, output process is kind of sRGB -> Linear
+                    // Apply sRGB first to view data as linear.
+
+                    col = col + (pow(vec3(linear(background.r), linear(background.g), linear(background.b)), vec3(1.0 / gamma)) - offset) * background.a;
+                    col = sign(col) * pow(abs(col), vec3(gamma));
+                    return vec3(sRGB(col.r), sRGB(col.g), sRGB(col.b));
+#endif // [DDS]
+
                 } else if (tonemap == FALSE_COLOR) {
                     return falseColor(log2(average(col)+0.03125) / 10.0 + 0.5) + (background.rgb - falseColor(0.0)) * background.a;
                 } else if (tonemap == POS_NEG) {

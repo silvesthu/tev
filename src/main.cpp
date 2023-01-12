@@ -170,7 +170,13 @@ int mainFunc(const vector<string>& arguments) {
     ValueFlag<float> gammaFlag{
         parser,
         "GAMMA",
+
+#if 0 // [DDS]
         "The exponent used when TONEMAP is 'Gamma'. Default is 2.2.",
+#else
+        "The exponent used when TONEMAP is 'Gamma'. Default is 1.0.",
+#endif // [DDS]
+
         {'g', "gamma"},
     };
 

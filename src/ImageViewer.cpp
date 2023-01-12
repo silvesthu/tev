@@ -77,7 +77,13 @@ ImageViewer::ImageViewer(const shared_ptr<BackgroundImagesLoader>& imagesLoader,
             mExposureLabel = new Label{panel, "", "sans-bold", 15};
 
             mExposureSlider = new Slider{panel};
+
+#if 0 // [DDS]
             mExposureSlider->set_range({-5.0f, 5.0f});
+#else
+            mExposureSlider->set_range({ -10.0f, 10.0f });
+#endif // [DDS]
+
             mExposureSlider->set_callback([this](float value) {
                 setExposure(value);
             });
@@ -110,7 +116,11 @@ ImageViewer::ImageViewer(const shared_ptr<BackgroundImagesLoader>& imagesLoader,
             mGammaSlider->set_callback([this](float value) {
                 setGamma(value);
             });
+#if 0 // [DDS]
             setGamma(2.2f);
+#else
+            setGamma(1.0f);
+#endif // [DDS]
 
             panel->set_tooltip(
                 "The offset is added to the image after exposure has been applied.\n"
@@ -293,6 +303,90 @@ ImageViewer::ImageViewer(const shared_ptr<BackgroundImagesLoader>& imagesLoader,
 
             mHistogram = new MultiGraph{panel, ""};
         }
+
+#if 0 // [DDS]
+#else
+        // Min, Max
+        {
+            panel = new Widget{ mSidebarLayout };
+            panel->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+
+            auto min_float_box = new FloatBox<float>(panel);
+            min_float_box->set_editable(true);
+            min_float_box->set_callback([this](float value) {
+                mImageCanvas->setMinMax({ value, mImageCanvas->MinMax().y() });
+                });
+
+            auto max_float_box = new FloatBox<float>(panel);
+            max_float_box->set_editable(true);
+            max_float_box->set_callback([this](float value) {
+                mImageCanvas->setMinMax({ mImageCanvas->MinMax().x(), value });
+                });
+
+            auto fit = [=] {
+                auto stat = mImageCanvas->canvasStatistics();
+                if (stat == nullptr || !stat->isReady())
+                    return;
+
+                min_float_box->set_value(stat->get()->minimum);
+                max_float_box->set_value(stat->get()->maximum);
+                mImageCanvas->setMinMax({ min_float_box->value(), max_float_box->value() });
+            };
+
+            auto reset = [=] {
+                min_float_box->set_value(0);
+                max_float_box->set_value(1);
+                mImageCanvas->setMinMax({ min_float_box->value(), max_float_box->value() });
+            };
+            reset();
+
+            panel = new Widget{ mSidebarLayout };
+            panel->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+
+            auto button = new Button{ panel, "Fit Range" };
+            button->set_font_size(15);
+            button->set_callback(fit);
+
+            button = new Button{ panel, "Reset [0,1]" };
+            button->set_font_size(15);
+            button->set_callback(reset);
+        }
+
+        // Channels
+        {
+            mChannelButtonContainer = new Widget{ mSidebarLayout };
+            mChannelButtonContainer->set_layout(new GridLayout{ Orientation::Horizontal, 4, Alignment::Fill, 5, 2 });
+
+            auto makeChannelButton = [&](const string& name, function<void(bool)> callback) {
+                auto button = new Button{ mChannelButtonContainer, name };
+                button->set_flags(Button::Flags::ToggleButton);
+                button->set_font_size(15);
+                button->set_change_callback(callback);
+                return button;
+            };
+
+            makeChannelButton("R", [this](bool) { setChannel(EChannel::ChannelR, false); });
+            makeChannelButton("G", [this](bool) { setChannel(EChannel::ChannelG, false); });
+            makeChannelButton("B", [this](bool) { setChannel(EChannel::ChannelB, false); });
+            makeChannelButton("A", [this](bool) { setChannel(EChannel::ChannelA, false); });
+
+            mChannelResetButtonContainer = new Widget{ mSidebarLayout };
+            mChannelResetButtonContainer->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+
+            auto makeChannelResetButton = [&](const string& name, function<void()> callback) {
+                auto button = new Button{ mChannelResetButtonContainer, name };
+                button->set_flags(Button::Flags::NormalButton);
+                button->set_font_size(15);
+                button->set_callback(callback);
+                return button;
+            };
+
+            makeChannelResetButton("RGB", [this]() { setChannel(EChannel::ChannelRGB, true); });
+            makeChannelResetButton("RGBA", [this]() { setChannel(EChannel::ChannelRGBA, true); });
+
+            setChannel(EChannel::ChannelRGBA, true);
+        }
+#endif // [DDS]
 
         // Fuzzy filter of open images
         {
@@ -1491,7 +1585,13 @@ void ImageViewer::normalizeExposureAndOffset() {
 void ImageViewer::resetImage() {
     setExposure(0);
     setOffset(0);
+
+#if 0 // [DDS]
     setGamma(2.2f);
+#else
+    setGamma(1.0f);
+#endif // [DDS]
+
     mImageCanvas->resetTransform();
 }
 
@@ -1516,6 +1616,24 @@ void ImageViewer::setMetric(EMetric metric) {
         Button* b = dynamic_cast<Button*>(buttons[i]);
         b->set_pushed((EMetric)i == metric);
     }
+}
+
+void ImageViewer::setChannel(EChannel channel, bool reset) {
+    EChannel new_channel = ChannelNone;
+    auto& buttons = mChannelButtonContainer->children();
+    for (size_t i = 0; i < buttons.size(); ++i) {
+        Button* b = dynamic_cast<Button*>(buttons[i]);
+
+        bool active_bit = ((1 << i) & channel) != 0;
+        bool pushed = b->pushed();
+        if (reset)
+            pushed = active_bit;
+
+        b->set_pushed(pushed);
+        if (pushed)
+            new_channel = static_cast<EChannel>(new_channel | (1 << i));
+    }
+    mImageCanvas->setChannel(new_channel);
 }
 
 nanogui::Vector2i ImageViewer::sizeToFitImage(const shared_ptr<Image>& image) {
@@ -1876,17 +1994,30 @@ void ImageViewer::updateTitle() {
 
         string valuesString;
         for (size_t i = 0; i < channelTails.size(); ++i) {
+#if 0 // [DDS]
             valuesString += fmt::format("{:.2f},", values[i]);
+#else
+            valuesString += fmt::format("{:.8f},", values[i]);
+#endif // [DDS]
         }
         valuesString.pop_back();
         valuesString += " / 0x";
         for (size_t i = 0; i < channelTails.size(); ++i) {
+#if 0 // [DDS]
             float tonemappedValue = channelTails[i] == "A" ? values[i] : toSRGB(values[i]);
+#else
+            float tonemappedValue = values[i];
+#endif // [DDS]
             unsigned char discretizedValue = (char)(tonemappedValue * 255 + 0.5f);
             valuesString += fmt::format("{:02X}", discretizedValue);
         }
 
+#if 0 // [DDS]
         caption += fmt::format(" – @{},{} / {}x{}: {}", imageCoords.x(), imageCoords.y(), mCurrentImage->size().x(), mCurrentImage->size().y(), valuesString);
+#else
+        caption += fmt::format(" – @{},{} / {}x{}: {}: {}", imageCoords.x(), imageCoords.y(), mCurrentImage->size().x(), mCurrentImage->size().y(), valuesString, mCurrentImage->format());
+#endif // [DDS]
+
         caption += fmt::format(" – {}%", (int)std::round(mImageCanvas->scale() * 100));
     }
 

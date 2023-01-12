@@ -50,8 +50,8 @@ Task<void> ImageData::convertToRec709(int priority) {
         Channel* b = nullptr;
 
         if (!(
-            ((r = mutableChannel(layer + "R")) && (g = mutableChannel(layer + "G")) && (b = mutableChannel(layer + "B"))) ||
-            ((r = mutableChannel(layer + "r")) && (g = mutableChannel(layer + "g")) && (b = mutableChannel(layer + "b")))
+            ((r == mutableChannel(layer + "R")) && (g == mutableChannel(layer + "G")) && (b == mutableChannel(layer + "B"))) ||
+            ((r == mutableChannel(layer + "r")) && (g == mutableChannel(layer + "g")) && (b == mutableChannel(layer + "b")))
         )) {
             // No RGB-triplet found
             continue;
@@ -181,13 +181,17 @@ Task<void> ImageData::ensureValid(const string& channelSelector, int taskPriorit
         }
     }
 
+#if 0 // [DDS] Ignore PremultipliedAlpha
     if (!hasPremultipliedAlpha) {
         co_await multiplyAlpha(taskPriority);
     }
+#endif // [DDS] Ignore PremultipliedAlpha
 
     co_await convertToRec709(taskPriority);
 
+#if 0 // [DDS] Ignore PremultipliedAlpha
     TEV_ASSERT(hasPremultipliedAlpha, "tev assumes an internal pre-multiplied-alpha representation.");
+#endif // [DDS] Ignore PremultipliedAlpha
     TEV_ASSERT(toRec709 == Matrix4f{1.0f}, "tev assumes an images to be internally represented in sRGB/Rec709 space.");
 }
 
@@ -529,6 +533,11 @@ string Image::toString() const {
     });
 
     sstream << join(localLayers, "\n");
+
+    sstream << "\n";
+    sstream << "\nFormat:\n";
+    sstream << mData.format << "\n";
+
     return sstream.str();
 }
 

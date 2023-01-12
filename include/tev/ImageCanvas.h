@@ -175,7 +175,12 @@ private:
     float mPixelRatio = 1;
     float mExposure = 0;
     float mOffset = 0;
+
+#if 0 // [DDS]
     float mGamma = 2.2f;
+#else
+    float mGamma = 1.0f;
+#endif // [DDS]
 
     bool mClipToLdr = false;
 
