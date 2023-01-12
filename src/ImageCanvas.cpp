@@ -72,9 +72,7 @@ void ImageCanvas::draw_contents() {
             mOffset,
             mGamma,
             mClipToLdr,
-            mTonemap,
-            mChannel,
-            mMinMax
+            mTonemap
         );
         return;
     }
@@ -86,16 +84,16 @@ void ImageCanvas::draw_contents() {
         // The uber shader operates in [-1, 1] coordinates and requires the _inserve_
         // image transform to obtain texture coordinates in [0, 1]-space.
         inverse(transform(mImage.get())),
-        mReference->texture(mRequestedChannelGroup),
+        // We're passing the channels found in `mImage` such that, if some channels don't
+        // exist in `mReference`, they're filled with default values (0 for colors, 1 for alpha).
+        mReference->texture(mImage->channelsInGroup(mRequestedChannelGroup)),
         inverse(transform(mReference.get())),
         mExposure,
         mOffset,
         mGamma,
         mClipToLdr,
         mTonemap,
-        mMetric,
-        mChannel,
-        mMinMax
+        mMetric
     );
 }
 
@@ -159,7 +157,7 @@ void ImageCanvas::drawPixelValuesAsText(NVGcontext* ctx) {
                     Vector2f pos;
 
                     if (shiftAndControlHeld) {
-                        float tonemappedValue = values[i];
+                        float tonemappedValue = Channel::tail(channels[i]) == "A" ? values[i] : toSRGB(values[i]);
                         unsigned char discretizedValue = (char)(tonemappedValue * 255 + 0.5f);
                         str = fmt::format("{:02X}", discretizedValue);
 
@@ -168,7 +166,7 @@ void ImageCanvas::drawPixelValuesAsText(NVGcontext* ctx) {
                             (float)m_pos.y() + nano.y(),
                         };
                     } else {
-                        str = fmt::format("{:.8f}", values[i]);
+                        str = std::abs(values[i]) > 100000 ? fmt::format("{:6g}", values[i]) : fmt::format("{:.5f}", values[i]);
 
                         pos = Vector2f{
                             (float)m_pos.x() + nano.x(),
@@ -230,7 +228,7 @@ void ImageCanvas::drawCoordinateSystem(NVGcontext* ctx) {
             nvgStroke(ctx);
         }
 
-        if (flags & Label) {
+        if (!name.empty() && (flags & Label)) {
             color.a() = textAlpha;
 
             nvgBeginPath(ctx);
@@ -255,22 +253,24 @@ void ImageCanvas::drawCoordinateSystem(NVGcontext* ctx) {
         nvgRestore(ctx);
     };
 
-    Color imageColor = Color(0.35f, 0.35f, 0.8f, 1.0f);
-    Color referenceColor = Color(0.7f, 0.4f, 0.4f, 1.0f);
-
     auto draw = [&](DrawFlags flags) {
         if (mReference) {
             if (mReference->dataWindow() != mImage->dataWindow()) {
-                drawWindow(mReference->dataWindow(), referenceColor, mReference->displayWindow().min.y() > mReference->dataWindow().min.y(), true, "Reference data window", flags);
+                drawWindow(mReference->dataWindow(), REFERENCE_COLOR, mReference->displayWindow().min.y() > mReference->dataWindow().min.y(), true, "Reference data window", flags);
             }
 
             if (mReference->displayWindow() != mImage->displayWindow()) {
-                drawWindow(mReference->displayWindow(), referenceColor, mReference->displayWindow().min.y() <= mReference->dataWindow().min.y(), true, "Reference display window", flags);
+                drawWindow(mReference->displayWindow(), REFERENCE_COLOR, mReference->displayWindow().min.y() <= mReference->dataWindow().min.y(), true, "Reference display window", flags);
             }
         }
 
-        drawWindow(mImage->dataWindow(),    imageColor,        mImage->displayWindow().min.y() > mImage->dataWindow().min.y(), false, "Data window", flags);
-        drawWindow(mImage->displayWindow(), Color(0.3f, 1.0f), mImage->displayWindow().min.y() <= mImage->dataWindow().min.y(),  false, "Display window", flags);
+        if (mImage->dataWindow() != mImage->displayWindow()) {
+            drawWindow(mImage->dataWindow(), IMAGE_COLOR, mImage->displayWindow().min.y() > mImage->dataWindow().min.y(), false, "Data window", flags);
+            drawWindow(mImage->displayWindow(), Color(0.3f, 1.0f), mImage->displayWindow().min.y() <= mImage->dataWindow().min.y(), false, "Display window", flags);
+        } else {
+            drawWindow(mImage->displayWindow(), Color(0.3f, 1.0f), mImage->displayWindow().min.y() <= mImage->dataWindow().min.y(), false, "", flags);
+        }
+
     };
 
     // Draw all labels after the regions to ensure no occlusion
@@ -302,9 +302,140 @@ void ImageCanvas::draw(NVGcontext* ctx) {
     if (mImage) {
         drawPixelValuesAsText(ctx);
 
-        // If the coordinate system is in any sort of way non-trivial, draw it!
-        if (mImage->dataWindow() != mImage->displayWindow() || mImage->displayWindow().min != Vector2i{0} ||
-            (mReference && (mReference->dataWindow() != mImage->dataWindow() || mReference->displayWindow() != mImage->displayWindow()))) {
+        auto displayWindowToNano = displayWindowToNanogui(mImage.get());
+
+        auto vgToNano = [&](const Vector2f& p) {
+            return Vector2f{m_pos} + displayWindowToNano * p;
+        };
+
+        auto applyVgCommand = [&](const VgCommand& command) {
+            const float* f = command.data.data();
+            switch (command.type) {
+                // State
+                case VgCommand::EType::Save: nvgSave(ctx); return;
+                case VgCommand::EType::Restore: nvgRestore(ctx); return;
+                // Draw calls
+                case VgCommand::EType::FillColor: nvgFillColor(ctx, {{{f[0], f[1], f[2], f[3]}}}); return;
+                case VgCommand::EType::Fill: nvgFill(ctx); return;
+                case VgCommand::EType::StrokeColor: nvgStrokeColor(ctx, {{{f[0], f[1], f[2], f[3]}}}); return;
+                case VgCommand::EType::Stroke: nvgStroke(ctx); return;
+                // Path control
+                case VgCommand::EType::BeginPath: nvgBeginPath(ctx); return;
+                case VgCommand::EType::ClosePath: nvgClosePath(ctx); return;
+                case VgCommand::EType::PathWinding: nvgPathWinding(ctx, (int)f[0]); return;
+                case VgCommand::EType::DebugDumpPathCache: nvgDebugDumpPathCache(ctx); return;
+                // Path construction
+                case VgCommand::EType::MoveTo: {
+                    Vector2f p = vgToNano({f[0], f[1]});
+                    nvgMoveTo(ctx, p.x(), p.y());
+                } return;
+                case VgCommand::EType::LineTo: {
+                    Vector2f p = vgToNano({f[0], f[1]});
+                    nvgLineTo(ctx, p.x(), p.y());
+                } return;
+                case VgCommand::EType::ArcTo: {
+                    Vector2f p1 = vgToNano({f[0], f[1]});
+                    Vector2f p2 = vgToNano({f[2], f[3]});
+                    float radius = f[4] * extractScale(displayWindowToNano);
+                    nvgArcTo(ctx, p1.x(), p1.y(), p2.x(), p2.y(), radius);
+                } return;
+                case VgCommand::EType::Arc: {
+                    Vector2f c = vgToNano({f[0], f[1]});
+                    float radius = f[2] * extractScale(displayWindowToNano);
+                    nvgArc(ctx, c.x(), c.y(), radius, f[3], f[4], (int)f[5]);
+                } return;
+                case VgCommand::EType::BezierTo: {
+                    Vector2f c1 = vgToNano({f[0], f[1]});
+                    Vector2f c2 = vgToNano({f[2], f[3]});
+                    Vector2f p = vgToNano({f[4], f[5]});
+                    nvgBezierTo(ctx, c1.x(), c1.y(), c2.x(), c2.y(), p.x(), p.y());
+                } return;
+                case VgCommand::EType::Circle: {
+                    Vector2f c = vgToNano({f[0], f[1]});
+                    float radius = f[2] * extractScale(displayWindowToNano);
+                    nvgCircle(ctx, c.x(), c.y(), radius);
+                } return;
+                case VgCommand::EType::Ellipse: {
+                    Vector2f c = vgToNano({f[0], f[1]});
+                    Vector2f r = extract2x2(displayWindowToNano) * Vector2f{f[2], f[3]};
+                    nvgEllipse(ctx, c.x(), c.y(), r.x(), r.y());
+                } return;
+                case VgCommand::EType::QuadTo: {
+                    Vector2f c = vgToNano({f[0], f[1]});
+                    Vector2f p = vgToNano({f[2], f[3]});
+                    nvgQuadTo(ctx, c.x(), c.y(), p.x(), p.y());
+                } return;
+                case VgCommand::EType::Rect: {
+                    Vector2f p = vgToNano({f[0], f[1]});
+                    Vector2f size = extract2x2(displayWindowToNano) * Vector2f{f[2], f[3]};
+                    nvgRect(ctx, p.x(), p.y(), size.x(), size.y());
+                } return;
+                case VgCommand::EType::RoundedRect: {
+                    Vector2f p = vgToNano({f[0], f[1]});
+                    Vector2f size = extract2x2(displayWindowToNano) * Vector2f{f[2], f[3]};
+                    float radius = f[4] * extractScale(displayWindowToNano);
+                    nvgRoundedRect(ctx, p.x(), p.y(), size.x(), size.y(), radius);
+                } return;
+                case VgCommand::EType::RoundedRectVarying: {
+                    Vector2f p = vgToNano({f[0], f[1]});
+                    Vector2f size = extract2x2(displayWindowToNano) * Vector2f{f[2], f[3]};
+                    float scale = extractScale(displayWindowToNano);
+                    nvgRoundedRectVarying(ctx, p.x(), p.y(), size.x(), size.y(), f[4] * scale, f[5] * scale, f[6] * scale, f[7] * scale);
+                } return;
+                // TODO: text rendering
+                default: throw runtime_error{"Invalid VgCommand type."};
+            }
+        };
+
+        // Draw image-specific vector graphics overlay for both the currently selected image as well as the reference.
+        auto applyVgCommandsSandboxed = [&](const Color& defaultColor, const vector<VgCommand>& commands) {
+            nvgSave(ctx);
+
+            nvgFillColor(ctx, defaultColor);
+            nvgStrokeColor(ctx, defaultColor);
+            nvgStrokeWidth(ctx, 3.0f);
+
+            size_t saveCounter = 0;
+            for (const auto& command : mImage->vgCommands()) {
+                if (command.type == VgCommand::EType::Save) {
+                    ++saveCounter;
+                } else if (command.type == VgCommand::EType::Restore) {
+                    if (saveCounter == 0) {
+                        tlog::warning() << "Malformed vector graphics commands: restore before save";
+                        continue;
+                    }
+
+                    --saveCounter;
+                }
+
+                applyVgCommand(command);
+            }
+
+            if (saveCounter > 0) {
+                tlog::warning() << "Malformed vector graphics commands: missing restore after save";
+                for (size_t i = 0; i < saveCounter; ++i) {
+                    nvgRestore(ctx);
+                }
+            }
+
+            nvgRestore(ctx);
+        };
+
+        if (mReference && !mReference->vgCommands().empty()) {
+            applyVgCommandsSandboxed(REFERENCE_COLOR, mReference->vgCommands());
+        }
+
+        if (!mImage->vgCommands().empty()) {
+            applyVgCommandsSandboxed(IMAGE_COLOR, mImage->vgCommands());
+        }
+
+        // If the coordinate system is in any sort of way non-trivial, or if a hotkey is held, draw it!
+        if (
+            glfwGetKey(screen()->glfw_window(), GLFW_KEY_B) ||
+            mImage->dataWindow() != mImage->displayWindow() ||
+            mImage->displayWindow().min != Vector2i{0} ||
+            (mReference && (mReference->dataWindow() != mImage->dataWindow() || mReference->displayWindow() != mImage->displayWindow()))
+        ) {
             drawCoordinateSystem(ctx);
         }
     }
@@ -360,13 +491,14 @@ void ImageCanvas::getValuesAtNanoPos(Vector2i nanoPos, vector<float>& result, co
     // Subtract reference if it exists.
     if (mReference) {
         auto referenceCoords = getImageCoords(*mReference, nanoPos);
-        auto referenceChannels = mReference->channelsInGroup(mRequestedChannelGroup);
         for (size_t i = 0; i < result.size(); ++i) {
-            float reference = i < referenceChannels.size() ?
-                mReference->channel(referenceChannels[i])->eval(referenceCoords) :
-                0.0f;
+            bool isAlpha = Channel::isAlpha(channels[i]);
+            float defaultVal = isAlpha && mReference->contains(referenceCoords) ? 1.0f : 0.0f;
 
-            result[i] = applyMetric(result[i], reference);
+            const Channel* c = mReference->channel(channels[i]);
+            float reference = c ? c->eval(referenceCoords) : defaultVal;
+
+            result[i] = isAlpha ? 0.5f * (result[i] + reference) : applyMetric(result[i], reference);
         }
     }
 }
@@ -629,58 +761,38 @@ vector<Channel> ImageCanvas::channelsFromImages(
         result.emplace_back(toUpper(Channel::tail(channelNames[i])), image->size());
     }
 
-    bool onlyAlpha = all_of(begin(result), end(result), [](const Channel& c) { return c.name() == "A"; });
-
     if (!reference) {
         ThreadPool::global().parallelFor(0, (int)channelNames.size(), [&](int i) {
-            const auto* chan = image->channel(channelNames[i]);
-            for (size_t j = 0; j < chan->numPixels(); ++j) {
-                result[i].at(j) = chan->eval(j);
+            const auto* channel = image->channel(channelNames[i]);
+            for (size_t j = 0; j < channel->numPixels(); ++j) {
+                result[i].at(j) = channel->eval(j);
             }
         }, priority);
     } else {
         Vector2i size = Vector2i{image->size().x(), image->size().y()};
         Vector2i offset = (Vector2i{reference->size().x(), reference->size().y()} - size) / 2;
-        auto referenceChannels = reference->channelsInGroup(requestedChannelGroup);
 
         ThreadPool::global().parallelFor<size_t>(0, channelNames.size(), [&](size_t i) {
-            const auto* chan = image->channel(channelNames[i]);
-            bool isAlpha = !onlyAlpha && result[i].name() == "A";
+            const auto* channel = image->channel(channelNames[i]);
 
-            if (i < referenceChannels.size()) {
-                const Channel* referenceChan = reference->channel(referenceChannels[i]);
-                if (isAlpha) {
-                    for (int y = 0; y < size.y(); ++y) {
-                        for (int x = 0; x < size.x(); ++x) {
-                            result[i].at({x, y}) = 0.5f * (
-                                chan->eval({x, y}) +
-                                referenceChan->eval({x + offset.x(), y + offset.y()})
-                            );
-                        }
-                    }
-                } else {
-                    for (int y = 0; y < size.y(); ++y) {
-                        for (int x = 0; x < size.x(); ++x) {
-                            result[i].at({x, y}) = ImageCanvas::applyMetric(
-                                chan->eval({x, y}),
-                                referenceChan->eval({x + offset.x(), y + offset.y()}),
-                                metric
-                            );
-                        }
+            const Channel* referenceChannel = reference->channel(channelNames[i]);
+            if (Channel::isAlpha(result[i].name())) {
+                for (int y = 0; y < size.y(); ++y) {
+                    for (int x = 0; x < size.x(); ++x) {
+                        result[i].at({x, y}) = 0.5f * (
+                            channel->eval({x, y}) +
+                            (referenceChannel ? referenceChannel->eval({x + offset.x(), y + offset.y()}) : 1.0f)
+                        );
                     }
                 }
             } else {
-                if (isAlpha) {
-                    for (int y = 0; y < size.y(); ++y) {
-                        for (int x = 0; x < size.x(); ++x) {
-                            result[i].at({x, y}) = chan->eval({x, y});
-                        }
-                    }
-                } else {
-                    for (int y = 0; y < size.y(); ++y) {
-                        for (int x = 0; x < size.x(); ++x) {
-                            result[i].at({x, y}) = ImageCanvas::applyMetric(chan->eval({x, y}), 0, metric);
-                        }
+                for (int y = 0; y < size.y(); ++y) {
+                    for (int x = 0; x < size.x(); ++x) {
+                        result[i].at({x, y}) = ImageCanvas::applyMetric(
+                            channel->eval({x, y}),
+                            referenceChannel ? referenceChannel->eval({x + offset.x(), y + offset.y()}) : 0.0f,
+                            metric
+                        );
                     }
                 }
             }

@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.13)
 
 project(
     tev
-    VERSION 1.24.2
+    VERSION 1.25
     DESCRIPTION "High dynamic range (HDR) image comparison tool for graphics people. With an emphasis on OpenEXR images."
     LANGUAGES C CXX
 )
@@ -15,9 +15,9 @@ if (NOT TEV_DEPLOY)
 endif()
 
 if (CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(TEV_VERSION "${TEV_VERSION} (64 bit)")
+    set(TEV_VERSION_ARCH "${TEV_VERSION} (64 bit)")
 elseif (CMAKE_SIZEOF_VOID_P EQUAL 4)
-    set(TEV_VERSION "${TEV_VERSION} (32 bit)")
+    set(TEV_VERSION_ARCH "${TEV_VERSION} (32 bit)")
 endif()
 
 # Set ourselves as the startup project in visual studio.
@@ -113,6 +113,10 @@ if (MSVC)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
     endif()
 
+    # tev uses UTF-8 chars. Specify UTF-8 charset explicitly.
+    # "/utf-8" is equivalent to "/source-charset:utf-8 /execution-charset:utf-8".
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
+
     # Disable warnings that are present in dependencies and irrelevant to us
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4100") # unused arguments
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd5054") # deprecated enum & operator
@@ -171,6 +175,7 @@ set(TEV_SOURCES
     include/tev/Task.h src/Task.cpp
     include/tev/ThreadPool.h src/ThreadPool.cpp
     include/tev/UberShader.h src/UberShader.cpp
+    include/tev/VectorGraphics.h src/VectorGraphics.cpp
 
     src/main.cpp
 )
@@ -193,9 +198,9 @@ if (APPLE)
     set_target_properties(tev PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist"
-        MACOSX_BUNDLE_BUNDLE_VERSION ${TEV_VERSION}
+        MACOSX_BUNDLE_BUNDLE_VERSION ${TEV_VERSION_ARCH}
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${TEV_VERSION}
-        MACOSX_BUNDLE_LONG_VERSION_STRING ${TEV_VERSION}
+        MACOSX_BUNDLE_LONG_VERSION_STRING ${TEV_VERSION_ARCH}
         RESOURCE "${RESOURCE_FILES}"
     )
 endif()
@@ -213,11 +218,10 @@ include_directories(
     ${STB_INCLUDE}
     ${TINYLOGGER_INCLUDE}
     ${UTFCPP_INCLUDE}
-    ${NAMEOF_INCLUDE}
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 
-set(TEV_DEFINITIONS -DTEV_VERSION="${TEV_VERSION}")
+set(TEV_DEFINITIONS -DTEV_VERSION="${TEV_VERSION_ARCH}")
 if (APPLE)
     # Starting with macOS Mojave OpenGL is deprecated. tev will switch
     # away from OpenGL once the underlying nanogui does, so there is no
@@ -238,14 +242,17 @@ else()
     install(TARGETS tev)
 
     configure_file(resources/tev.desktop resources/tev.desktop)
-    install(FILES ${CMAKE_BINARY_DIR}/resources/tev.desktop DESTINATION "${CMAKE_INSTALL_FULL_DATAROOTDIR}/applications")
-    install(FILES resources/icon-512.png DESTINATION "${CMAKE_INSTALL_FULL_DATAROOTDIR}/icons/hicolor/512x512/apps" RENAME tev.png)
-    install(FILES resources/icon-256.png DESTINATION "${CMAKE_INSTALL_FULL_DATAROOTDIR}/icons/hicolor/256x256/apps" RENAME tev.png)
-    install(FILES resources/icon-128.png DESTINATION "${CMAKE_INSTALL_FULL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME tev.png)
-    install(FILES resources/icon-96.png DESTINATION "${CMAKE_INSTALL_FULL_DATAROOTDIR}/icons/hicolor/96x96/apps" RENAME tev.png)
-    install(FILES resources/icon-64.png DESTINATION "${CMAKE_INSTALL_FULL_DATAROOTDIR}/icons/hicolor/64x64/apps" RENAME tev.png)
-    install(FILES resources/icon-48.png DESTINATION "${CMAKE_INSTALL_FULL_DATAROOTDIR}/icons/hicolor/48x48/apps" RENAME tev.png)
-    install(FILES resources/icon-32.png DESTINATION "${CMAKE_INSTALL_FULL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME tev.png)
-    install(FILES resources/icon-24.png DESTINATION "${CMAKE_INSTALL_FULL_DATAROOTDIR}/icons/hicolor/24x24/apps" RENAME tev.png)
-    install(FILES resources/icon-16.png DESTINATION "${CMAKE_INSTALL_FULL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME tev.png)
+    install(FILES ${CMAKE_BINARY_DIR}/resources/tev.desktop DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+
+    set(ICON_RESOLUTIONS "16;24;32;48;64;96;128;256;512")
+    foreach(RES IN LISTS ICON_RESOLUTIONS)
+        install(FILES resources/icon-${RES}.png DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/${RES}x${RES}/apps" RENAME tev.png)
+    endforeach()
+
+    list(APPEND CPACK_GENERATOR External)
+    set(CPACK_EXTERNAL_PACKAGE_SCRIPT "${PROJECT_SOURCE_DIR}/scripts/create-appimage.cmake")
+    set(CPACK_EXTERNAL_ENABLE_STAGING YES)
+    set(CPACK_PACKAGE_FILE_NAME ${PROJECT_NAME})
+    set(CPACK_PACKAGING_INSTALL_PREFIX /usr) # requirement by AppDir specification
+    include(CPack)
 endif()

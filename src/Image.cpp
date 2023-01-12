@@ -181,13 +181,13 @@ Task<void> ImageData::ensureValid(const string& channelSelector, int taskPriorit
         }
     }
 
-    //if (!hasPremultipliedAlpha) {
-    //    co_await multiplyAlpha(taskPriority);
-    //}
+    if (!hasPremultipliedAlpha) {
+        co_await multiplyAlpha(taskPriority);
+    }
 
     co_await convertToRec709(taskPriority);
 
-    // TEV_ASSERT(hasPremultipliedAlpha, "tev assumes an internal pre-multiplied-alpha representation.");
+    TEV_ASSERT(hasPremultipliedAlpha, "tev assumes an internal pre-multiplied-alpha representation.");
     TEV_ASSERT(toRec709 == Matrix4f{1.0f}, "tev assumes an images to be internally represented in sRGB/Rec709 space.");
 }
 
@@ -267,25 +267,27 @@ Texture* Image::texture(const vector<string>& channelNames) {
 
     vector<Task<void>> tasks;
     for (size_t i = 0; i < 4; ++i) {
+        float defaultVal = i == 3 ? 1 : 0;
         if (i < channelNames.size()) {
-            const auto& channelName = channelNames[i];
-            const auto* chan = channel(channelName);
+            const auto* chan = channel(channelNames[i]);
             if (!chan) {
-                throw invalid_argument{fmt::format("Cannot obtain texture of {}:{}, because the channel does not exist.", path(), channelName)};
+                tasks.emplace_back(
+                    ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&data, defaultVal, i](size_t j) {
+                        data[j * 4 + i] = defaultVal;
+                    }, std::numeric_limits<int>::max())
+                );
+            } else {
+                const auto& channelData = chan->data();
+                tasks.emplace_back(
+                    ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&channelData, &data, i](size_t j) {
+                        data[j * 4 + i] = channelData[j];
+                    }, std::numeric_limits<int>::max())
+                );
             }
-
-            bool is_alpha = channelName == "A";
-            const auto& channelData = chan->data();
-            tasks.emplace_back(
-                ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&channelData, &data, is_alpha, i](size_t j) {
-                    data[j * 4 + i] = is_alpha ? channelData[j] : toLinear(channelData[j]); // to cancel toSRGB on sampling (not sure why glsl treat input of R32G32B32A32_FLOAT as sRGB)
-                }, std::numeric_limits<int>::max())
-            );
         } else {
-            float val = i == 3 ? 1 : 0;
             tasks.emplace_back(
-                ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&data, val, i](size_t j) {
-                    data[j * 4 + i] = val;
+                ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&data, defaultVal, i](size_t j) {
+                    data[j * 4 + i] = defaultVal;
                 }, std::numeric_limits<int>::max())
             );
         }
@@ -422,6 +424,16 @@ vector<string> Image::getSortedChannels(const string& layerName) const {
     return result;
 }
 
+vector<string> Image::getExistingChannels(const vector<string>& requestedChannels) const {
+    vector<string> result;
+    std::copy_if(std::begin(requestedChannels), std::end(requestedChannels), std::back_inserter(result),
+        [&](const string& c) {
+            return hasChannel(c);
+        }
+    );
+    return result;
+}
+
 void Image::updateChannel(const string& channelName, int x, int y, int width, int height, const vector<float>& data) {
     Channel* chan = mutableChannel(channelName);
     if (!chan) {
@@ -467,6 +479,14 @@ void Image::updateChannel(const string& channelName, int x, int y, int width, in
     }
 }
 
+void Image::updateVectorGraphics(bool append, const vector<VgCommand>& commands) {
+    if (!append) {
+        mVgCommands.clear();
+    }
+
+    std::copy(std::begin(commands), std::end(commands), std::back_inserter(mVgCommands));
+}
+
 template <typename T>
 time_t to_time_t(T timePoint) {
     // `clock_cast` appears to throw errors on some systems, so we're using this slightly hacky
@@ -508,11 +528,7 @@ string Image::toString() const {
         }
     });
 
-    sstream << join(localLayers, "\n") << "\n";
-
-    sstream << "\nFormat:\n";
-    sstream << mData.format << "\n";
-
+    sstream << join(localLayers, "\n");
     return sstream.str();
 }
 

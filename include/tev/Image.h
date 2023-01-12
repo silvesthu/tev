@@ -7,6 +7,7 @@
 #include <tev/Channel.h>
 #include <tev/SharedQueue.h>
 #include <tev/ThreadPool.h>
+#include <tev/VectorGraphics.h>
 
 #include <nanogui/texture.h>
 
@@ -153,9 +154,14 @@ public:
 
     std::vector<std::string> channelsInGroup(const std::string& groupName) const;
     std::vector<std::string> getSortedChannels(const std::string& layerName) const;
+    std::vector<std::string> getExistingChannels(const std::vector<std::string>& requestedChannels) const;
 
     nanogui::Vector2i size() const {
         return mData.size();
+    }
+
+    bool contains(const nanogui::Vector2i& pos) const {
+        return pos.x() >= 0 && pos.y() >= 0 && pos.x() < mData.size().x() && pos.y() < mData.size().y();
     }
 
     const Box2i& dataWindow() const {
@@ -197,6 +203,12 @@ public:
 
     void updateChannel(const std::string& channelName, int x, int y, int width, int height, const std::vector<float>& data);
 
+    void updateVectorGraphics(bool append, const std::vector<VgCommand>& commands);
+
+    const std::vector<VgCommand>& vgCommands() const {
+        return mVgCommands;
+    }
+
     void setStaleIdCallback(const std::function<void(int)>& callback) {
         mStaleIdCallback = callback;
     }
@@ -224,6 +236,8 @@ private:
     ImageData mData;
 
     std::vector<ChannelGroup> mChannelGroups;
+
+    std::vector<VgCommand> mVgCommands;
 
     std::function<void(int)> mStaleIdCallback;
 
