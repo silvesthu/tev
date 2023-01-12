@@ -3,10 +3,10 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - DDS
   pull_request:
     branches:
-      - master
+      - DDS
 
 jobs:
   build_linux:
