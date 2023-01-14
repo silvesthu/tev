@@ -274,6 +274,26 @@ Texture* Image::texture(const vector<string>& channelNames) {
         float defaultVal = i == 3 ? 1 : 0;
         if (i < channelNames.size()) {
             const auto* chan = channel(channelNames[i]);
+
+#if 1 // [DDS]
+            if (!chan && !channelNames[i].empty())
+            {
+                char alternativeChannel[] = { 'R', 'G', 'B', 'A' };
+                std::string alternativeName = channelNames[i];
+                char replacement = 0;
+                if (channelNames[i].back() == 'L')
+                    replacement = alternativeChannel[i];
+                else if (channelNames[i].back() == alternativeChannel[i])
+                    replacement = 'L';
+
+                if (replacement != 0) {
+                    alternativeName.pop_back();
+                    alternativeName.push_back(replacement);
+                    chan = channel(alternativeName);
+                }
+            }
+#endif // [DDS]
+
             if (!chan) {
                 tasks.emplace_back(
                     ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&data, defaultVal, i](size_t j) {
@@ -515,6 +535,9 @@ string Image::toString() const {
         sstream << "Data window: (" << dataWindow().min.x() << ", " << dataWindow().min.y() << ")(" << dataWindow().max.x() << ", " << dataWindow().max.y() << ")\n";
     }
 
+    sstream << "\nFormat:\n";
+    sstream << mData.format << "\n";
+
     sstream << "\nChannels:\n";
 
     auto localLayers = mData.layers;
@@ -533,10 +556,6 @@ string Image::toString() const {
     });
 
     sstream << join(localLayers, "\n");
-
-    sstream << "\n";
-    sstream << "\nFormat:\n";
-    sstream << mData.format << "\n";
 
     return sstream.str();
 }

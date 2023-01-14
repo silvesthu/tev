@@ -4,9 +4,11 @@
 #include <tev/imageio/DdsImageLoader.h>
 #include <tev/ThreadPool.h>
 
-#include <nameof.hpp>
-
 #include <DirectXTex.h>
+
+#if 1 // [DDS]
+#include <nameof.hpp>
+#endif // [DDS]
 
 using namespace nanogui;
 using namespace std;
@@ -203,6 +205,7 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
             throw invalid_argument{fmt::format("Unsupported DXGI format: {}", static_cast<int>(metadata.format))};
     }
 
+#if 0 // [DDS]
     // Use DirectXTex to either decompress or convert to the target floating point format.
     if (DirectX::IsCompressed(metadata.format)) {
         DirectX::ScratchImage decompImage;
@@ -233,9 +236,71 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
             resultData.channels[c].at(i) = typedData[baseIdx + c];
         }
     }, priority);
+#else
+    auto numPixels = (size_t)metadata.width * metadata.height;
+    if (numPixels == 0) {
+        throw invalid_argument{ "DDS image has zero pixels." };
+    }
 
+    for (int arrayIndex = 0; arrayIndex < metadata.arraySize; ++arrayIndex)
+    {
+        for (size_t mipLevel = 0; mipLevel < metadata.mipLevels; ++mipLevel)
+        {
+            for (int slice = 0; slice < metadata.depth; ++slice)
+            {
+                const uint8_t* pixels = scratchImage.GetImage(mipLevel, arrayIndex, slice)->pixels;
+
+                // Use DirectXTex to either decompress or convert to the target floating point format.
+                DirectX::ScratchImage convertedScratchImage;
+                if (DirectX::IsCompressed(metadata.format)) {
+                    if (DirectX::Decompress(*scratchImage.GetImage(mipLevel, arrayIndex, slice), format, convertedScratchImage) != S_OK) {
+                        throw invalid_argument{ "Failed to decompress DDS image." };
+                    }
+                    pixels = convertedScratchImage.GetPixels();
+                }
+                else if (metadata.format != format) {
+                    if (DirectX::Convert(*scratchImage.GetImage(mipLevel, arrayIndex, slice), format, DirectX::TEX_FILTER_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT, convertedScratchImage) != S_OK) {
+                        throw invalid_argument{ "Failed to convert DDS image." };
+                    }
+                    pixels = convertedScratchImage.GetPixels();
+                }
+
+                std::string cubeFaceNames[] = { "X+", "X-", "Y+", "Y-", "Z+", "Z-" };
+                std::string layerPrefix = fmt::format("[{}]{}.M{:02}.D{:02}.",
+                    std::to_string(metadata.IsCubemap() ? arrayIndex / 6 : arrayIndex),
+                    metadata.IsCubemap() ? cubeFaceNames[arrayIndex % 6] : "",
+                    mipLevel,
+                    slice);
+                std::vector<Channel> channels = makeNChannels(numChannels, { (int)metadata.width, (int)metadata.height }, layerPrefix);
+
+                // Read the data as it is
+                auto typedData = reinterpret_cast<const float*>(pixels);
+                co_await ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&](size_t i) {
+                    size_t mipWidth = metadata.width >> mipLevel;
+                    size_t w = (i % metadata.width) >> mipLevel;
+                    size_t h = (i / metadata.width) >> mipLevel;
+                    size_t baseIdx = (w + h * mipWidth) * numChannels;
+                    for (int c = 0; c < numChannels; ++c) {
+                        channels[c].at(i) = typedData[baseIdx + c]; // Pitch?
+                    }
+                    }, priority);
+
+                for (const Channel& channel : channels)
+                    resultData.channels.push_back(channel);
+            }
+        }
+    }
+#endif // [DDS]
+
+#if 0 // [DDS]
+    resultData.hasPremultipliedAlpha = false;
+#else
     resultData.hasPremultipliedAlpha = scratchImage.GetMetadata().IsPMAlpha();
-    resultData.format = NAMEOF_ENUM(metadata.format);
+#endif // [DDS]
+
+#if 1 // [DDS]
+    resultData.format = fmt::format(" {} - {} Depth - {} Array - {} Mips", std::string(NAMEOF_ENUM(metadata.format)), metadata.depth, metadata.arraySize, metadata.mipLevels);
+#endif // [DDS]
 
     co_return result;
 }

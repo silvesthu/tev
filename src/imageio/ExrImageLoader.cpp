@@ -16,6 +16,10 @@
 
 #include <errno.h>
 
+#if 1 // [DDS]
+#include <nameof.hpp>
+#endif // [DDS]
+
 using namespace nanogui;
 using namespace std;
 
@@ -265,7 +269,16 @@ Task<vector<ImageData>> ExrImageLoader::load(istream& iStream, const fs::path& p
         part.readPixels(dataWindow.min.y, dataWindow.max.y);
 
         data.hasPremultipliedAlpha = true;
-        data.format = "Exr";
+
+#if 1 // [DDS]
+        std::vector<std::string> formats;
+        const Imf::ChannelList& imfChannels = part.header().channels();
+        for (Imf::ChannelList::ConstIterator c = imfChannels.begin(); c != imfChannels.end(); ++c) {
+            formats.push_back(std::string(NAMEOF_ENUM(c.channel().type)));
+        }
+        data.format = "EXR (" + join(formats, ",") + ")";
+#endif // [DDS]
+
         if (part.header().hasName()) {
             data.partName = part.header().name();
         }

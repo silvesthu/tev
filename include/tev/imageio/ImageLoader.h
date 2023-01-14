@@ -29,7 +29,11 @@ public:
     static const std::vector<std::unique_ptr<ImageLoader>>& getLoaders();
 
 protected:
+#if 0 // [DDS]
     static std::vector<Channel> makeNChannels(int numChannels, const nanogui::Vector2i& size);
+#else
+    static std::vector<Channel> makeNChannels(int numChannels, const nanogui::Vector2i& size, std::string layerPrefix = "");
+#endif // [DDS]
 };
 
 TEV_NAMESPACE_END

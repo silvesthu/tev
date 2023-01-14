@@ -36,16 +36,20 @@ const vector<unique_ptr<ImageLoader>>& ImageLoader::getLoaders() {
     return imageLoaders;
 }
 
+#if 0 // [DDS]
 vector<Channel> ImageLoader::makeNChannels(int numChannels, const Vector2i& size) {
+#else
+vector<Channel> ImageLoader::makeNChannels(int numChannels, const Vector2i& size, std::string layerPrefix) {
+#endif // [DDS]
     vector<Channel> channels;
     if (numChannels > 1) {
         const vector<string> channelNames = {"R", "G", "B", "A"};
         for (int c = 0; c < numChannels; ++c) {
             string name = c < (int)channelNames.size() ? channelNames[c] : to_string(c);
-            channels.emplace_back(name, size);
+            channels.emplace_back(layerPrefix + name, size);
         }
     } else {
-        channels.emplace_back("L", size);
+        channels.emplace_back(layerPrefix + "L", size);
     }
 
     return channels;

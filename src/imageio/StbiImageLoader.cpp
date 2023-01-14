@@ -45,10 +45,6 @@ Task<vector<ImageData>> StbiImageLoader::load(istream& iStream, const fs::path& 
     iStream.clear();
     iStream.seekg(0);
 
-    bool is16bit = stbi_is_16_bit_from_callbacks(&callbacks, &iStream) != 0;
-    iStream.clear();
-    iStream.seekg(0);
-
     if (isHdr) {
         data = stbi_loadf_from_callbacks(&callbacks, &iStream, &size.x(), &size.y(), &numChannels, 0);
     } else {
@@ -92,7 +88,14 @@ Task<vector<ImageData>> StbiImageLoader::load(istream& iStream, const fs::path& 
     }
 
     resultData.hasPremultipliedAlpha = false;
-    resultData.format = path.extension().string().substr(1) + " " + (is16bit ? "16bit" : "8bit");
+
+#if 1 // [DDS]
+    bool is16bit = stbi_is_16_bit_from_callbacks(&callbacks, &iStream) != 0;
+    iStream.clear();
+    iStream.seekg(0);
+
+    resultData.format = is16bit ? "16bit" : "8bit";
+#endif // [DDS]
 
     co_return result;
 }

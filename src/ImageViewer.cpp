@@ -370,21 +370,7 @@ ImageViewer::ImageViewer(const shared_ptr<BackgroundImagesLoader>& imagesLoader,
             makeChannelButton("B", [this](bool) { setChannel(EChannel::ChannelB, false); });
             makeChannelButton("A", [this](bool) { setChannel(EChannel::ChannelA, false); });
 
-            mChannelResetButtonContainer = new Widget{ mSidebarLayout };
-            mChannelResetButtonContainer->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
-
-            auto makeChannelResetButton = [&](const string& name, function<void()> callback) {
-                auto button = new Button{ mChannelResetButtonContainer, name };
-                button->set_flags(Button::Flags::NormalButton);
-                button->set_font_size(15);
-                button->set_callback(callback);
-                return button;
-            };
-
-            makeChannelResetButton("RGB", [this]() { setChannel(EChannel::ChannelRGB, true); });
-            makeChannelResetButton("RGBA", [this]() { setChannel(EChannel::ChannelRGBA, true); });
-
-            setChannel(EChannel::ChannelRGBA, true);
+            setChannel(EChannel::ChannelRGB, true);
         }
 #endif // [DDS]
 
@@ -400,7 +386,12 @@ ImageViewer::ImageViewer(const shared_ptr<BackgroundImagesLoader>& imagesLoader,
                 return setFilter(filter);
             });
 
+#if 0 // [DDS]
             mFilter->set_placeholder("Find");
+#else
+            mFilter->set_placeholder("Filter by image:group");
+#endif // [DDS]
+
             mFilter->set_tooltip(fmt::format(
                 "Filters visible images and channel groups according to a supplied string. "
                 "The string must have the format 'image:group'. "
@@ -1985,7 +1976,11 @@ void ImageViewer::updateTitle() {
         auto channelTails = channels;
         transform(begin(channelTails), end(channelTails), begin(channelTails), Channel::tail);
 
+#if 0 // [DDS]
         caption = fmt::format("{} – {}", mCurrentImage->shortName(), mCurrentGroup);
+#else
+        caption = fmt::format("{} – {}", mCurrentImage->shortName(), mCurrentImage->format());
+#endif // [DDS]
 
         auto rel = mouse_pos() - mImageCanvas->position();
         vector<float> values = mImageCanvas->getValuesAtNanoPos({rel.x(), rel.y()}, channels);
@@ -2001,23 +1996,18 @@ void ImageViewer::updateTitle() {
 #endif // [DDS]
         }
         valuesString.pop_back();
+
+#if 0 // [DDS]
         valuesString += " / 0x";
         for (size_t i = 0; i < channelTails.size(); ++i) {
-#if 0 // [DDS]
+
             float tonemappedValue = channelTails[i] == "A" ? values[i] : toSRGB(values[i]);
-#else
-            float tonemappedValue = values[i];
-#endif // [DDS]
             unsigned char discretizedValue = (char)(tonemappedValue * 255 + 0.5f);
             valuesString += fmt::format("{:02X}", discretizedValue);
         }
-
-#if 0 // [DDS]
-        caption += fmt::format(" – @{},{} / {}x{}: {}", imageCoords.x(), imageCoords.y(), mCurrentImage->size().x(), mCurrentImage->size().y(), valuesString);
-#else
-        caption += fmt::format(" – @{},{} / {}x{}: {}: {}", imageCoords.x(), imageCoords.y(), mCurrentImage->size().x(), mCurrentImage->size().y(), valuesString, mCurrentImage->format());
 #endif // [DDS]
 
+        caption += fmt::format(" – @{},{} / {}x{}: {}", imageCoords.x(), imageCoords.y(), mCurrentImage->size().x(), mCurrentImage->size().y(), valuesString);
         caption += fmt::format(" – {}%", (int)std::round(mImageCanvas->scale() * 100));
     }
 
@@ -2044,6 +2034,20 @@ int ImageViewer::groupId(const string& groupName) const {
             break;
         }
     }
+
+#if 1 // [DDS]
+    if (pos >= groups.size())
+    {
+        pos = 0;
+        std::string targetLayerName = Channel::split(groupName).first;
+        for (; pos < groups.size(); ++pos) {
+            std::string layerName = Channel::split(groups[pos].name).first;
+            if (!layerName.empty() && layerName == targetLayerName) {
+                break;
+            }
+        }
+    }
+#endif // [DDS]
 
     return pos >= groups.size() ? -1 : (int)pos;
 }

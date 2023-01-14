@@ -227,7 +227,6 @@ private:
     std::set<std::shared_ptr<Image>> mToBump;
 
     nanogui::Widget* mChannelButtonContainer;
-    nanogui::Widget* mChannelResetButtonContainer;
 
     nanogui::TextBox* mFilter;
     nanogui::Button* mRegexButton;

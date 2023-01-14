@@ -65,7 +65,6 @@ Task<vector<ImageData>> QoiImageLoader::load(istream& iStream, const fs::path&, 
 
     resultData.channels = makeNChannels(numChannels, size);
     resultData.hasPremultipliedAlpha = false;
-    resultData.format = "Qoi";
 
     if (desc.colorspace == QOI_LINEAR) {
         co_await ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&](size_t i) {
