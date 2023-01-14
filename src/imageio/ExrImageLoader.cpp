@@ -271,12 +271,14 @@ Task<vector<ImageData>> ExrImageLoader::load(istream& iStream, const fs::path& p
         data.hasPremultipliedAlpha = true;
 
 #if 1 // [DDS]
+        data.sRGB = false;
+
         std::vector<std::string> formats;
         const Imf::ChannelList& imfChannels = part.header().channels();
         for (Imf::ChannelList::ConstIterator c = imfChannels.begin(); c != imfChannels.end(); ++c) {
             formats.push_back(std::string(NAMEOF_ENUM(c.channel().type)));
         }
-        data.format = "EXR (" + join(formats, ",") + ")";
+        data.format = join(formats, ",");
 #endif // [DDS]
 
         if (part.header().hasName()) {

@@ -34,6 +34,10 @@ struct ImageData {
     nanogui::Matrix4f toRec709 = nanogui::Matrix4f{1.0f}; // Identity by default
     bool hasPremultipliedAlpha;
 
+#if 1 // [DDS]
+    bool sRGB = true;
+#endif // [DDS]
+
     using Surface = std::vector<Channel>;
     std::vector<Surface> surfaces;
 

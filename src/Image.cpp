@@ -302,11 +302,20 @@ Texture* Image::texture(const vector<string>& channelNames) {
                 );
             } else {
                 const auto& channelData = chan->data();
+#if 0 // [DDS]
                 tasks.emplace_back(
                     ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&channelData, &data, i](size_t j) {
                         data[j * 4 + i] = channelData[j];
                     }, std::numeric_limits<int>::max())
                 );
+#else
+                bool sRGB = mData.sRGB;
+                tasks.emplace_back(
+                    ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&channelData, &data, i, sRGB](size_t j) {
+                        data[j * 4 + i] = sRGB ? toSRGB(channelData[j]) : channelData[j];
+                    }, std::numeric_limits<int>::max())
+                );
+#endif // [DDS]
             }
         } else {
             tasks.emplace_back(

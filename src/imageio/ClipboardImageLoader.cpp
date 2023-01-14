@@ -93,11 +93,7 @@ Task<vector<ImageData>> ClipboardImageLoader::load(istream& iStream, const fs::p
                 } else {
                     float alpha = premultipliedAlpha ? resultData.channels[alphaChannelIndex].at({x, y}) : 1.0f;
                     float alphaFactor = alpha == 0 ? 0 : (1.0f / alpha);
-#if 0 // [DDS]
-                    resultData.channels[c].at({x, y}) = toLinear(val / 255.0f * alphaFactor);
-#else
                     resultData.channels[c].at({x, y}) = val / 255.0f * alphaFactor;
-#endif // [DDS]
                 }
             }
         }

@@ -292,13 +292,11 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
     }
 #endif // [DDS]
 
-#if 0 // [DDS]
-    resultData.hasPremultipliedAlpha = false;
-#else
     resultData.hasPremultipliedAlpha = scratchImage.GetMetadata().IsPMAlpha();
-#endif // [DDS]
 
 #if 1 // [DDS]
+    resultData.sRGB = false;
+
     resultData.format = fmt::format(" {} - {} Depth - {} Array - {} Mips", std::string(NAMEOF_ENUM(metadata.format)), metadata.depth, metadata.arraySize, metadata.mipLevels);
 #endif // [DDS]
 
