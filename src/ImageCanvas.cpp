@@ -911,7 +911,11 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
 
     co_await ThreadPool::global().parallelForAsync(0, nChannels, [&](int i) {
         for (size_t j = 0; j < numPixels; ++j) {
+#if 0 // [DDS]
             result->histogram[indices[j + i * numPixels] + i * NUM_BINS] += alphaChannel ? alphaChannel->eval(j) : 1;
+#else
+            result->histogram[indices[j + i * numPixels] + i * NUM_BINS] += 1; // count pixel, ignore alpha
+#endif // [DDS]
         }
     }, priority);
 
