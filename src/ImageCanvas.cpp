@@ -510,8 +510,13 @@ void ImageCanvas::getValuesAtNanoPos(Vector2i nanoPos, vector<float>& result, co
             float defaultVal = isAlpha && mReference->contains(referenceCoords) ? 1.0f : 0.0f;
 
             const Channel* c = mReference->channel(channels[i]);
-            float reference = c ? c->eval(referenceCoords) : defaultVal;
 
+#if 1 // [DDS]
+            if (c == nullptr)
+                c = mReference->channel(channels[i], Channel::looseMatch);
+#endif // [DDS]
+
+            float reference = c ? c->eval(referenceCoords) : defaultVal;
             result[i] = isAlpha ? 0.5f * (result[i] + reference) : applyMetric(result[i], reference);
         }
     }
@@ -790,6 +795,12 @@ vector<Channel> ImageCanvas::channelsFromImages(
             const auto* channel = image->channel(channelNames[i]);
 
             const Channel* referenceChannel = reference->channel(channelNames[i]);
+
+#if 1 // [DDS]
+            if (referenceChannel == nullptr)
+                referenceChannel = reference->channel(channelNames[i], Channel::looseMatch);
+#endif // [DDS]
+
             if (Channel::isAlpha(result[i].name())) {
                 for (int y = 0; y < size.y(); ++y) {
                     for (int x = 0; x < size.x(); ++x) {

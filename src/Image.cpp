@@ -276,22 +276,8 @@ Texture* Image::texture(const vector<string>& channelNames) {
             const auto* chan = channel(channelNames[i]);
 
 #if 1 // [DDS]
-            if (!chan && !channelNames[i].empty())
-            {
-                char alternativeChannel[] = { 'R', 'G', 'B', 'A' };
-                std::string alternativeName = channelNames[i];
-                char replacement = 0;
-                if (channelNames[i].back() == 'L')
-                    replacement = alternativeChannel[i];
-                else if (channelNames[i].back() == alternativeChannel[i])
-                    replacement = 'L';
-
-                if (replacement != 0) {
-                    alternativeName.pop_back();
-                    alternativeName.push_back(replacement);
-                    chan = channel(alternativeName);
-                }
-            }
+            if (chan == nullptr)
+                chan = channel(channelNames[i], Channel::looseMatch);
 #endif // [DDS]
 
             if (!chan) {

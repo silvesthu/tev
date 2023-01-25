@@ -21,6 +21,8 @@ public:
     static std::string tail(const std::string& fullChannel);
     static std::string head(const std::string& fullChannel);
 
+    static bool looseMatch(const std::string& lhsFullChannel, const std::string& rhsFullChannel);
+
     static bool isTopmost(const std::string& fullChannel);
     static bool isAlpha(const std::string& fullChannel);
 

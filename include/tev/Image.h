@@ -87,6 +87,23 @@ struct ImageData {
         }
     }
 
+#if 1 // [DDS]
+    const Channel* channel(const std::string& channelName, std::function<bool (const std::string&, const std::string&)> comparator) const {
+        auto it = std::find_if(
+            std::begin(channels),
+            std::end(channels),
+            [&channelName, &comparator](const Channel& c) { return comparator(c.name(), channelName); }
+        );
+
+        if (it != std::end(channels)) {
+            return &(*it);
+        }
+        else {
+            return nullptr;
+        }
+    }
+#endif // [DDS]
+
     Channel* mutableChannel(const std::string& channelName) {
         auto it = std::find_if(
             std::begin(channels),
@@ -152,6 +169,12 @@ public:
     const Channel* channel(const std::string& channelName) const {
         return mData.channel(channelName);
     }
+
+#if 1 // [DDS]
+    const Channel* channel(const std::string& channelName, std::function<bool (const std::string&, const std::string&)> comparator) const {
+        return mData.channel(channelName, comparator);
+    }
+#endif // [DDS]
 
     nanogui::Texture* texture(const std::string& channelGroupName);
     nanogui::Texture* texture(const std::vector<std::string>& channelNames);

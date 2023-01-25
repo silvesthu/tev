@@ -24,6 +24,18 @@ string Channel::tail(const string& channel) {
     return split(channel).second;
 }
 
+bool Channel::looseMatch(const string& lhsFullChannel, const string& rhsFullChannel) {
+    std::string lTail = tail(lhsFullChannel);
+    std::string rTail = tail(rhsFullChannel);
+
+    if (lTail == rTail)
+        return true;
+    if (lTail == "L" || rTail == "L")
+        return true;
+
+    return false;
+}
+
 string Channel::head(const string& channel) {
     return split(channel).first;
 }
