@@ -14,8 +14,8 @@ cmake \
     -DTEV_DEPLOY=1 \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-    ../..
-make -j
+    ../.. || exit 1
+make -j || exit 1
 cd ..
 
 echo "Creating dmg..."

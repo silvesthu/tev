@@ -11,7 +11,7 @@
 
 #include <memory>
 
-TEV_NAMESPACE_BEGIN
+namespace tev {
 
 struct CanvasStatistics {
     float mean;
@@ -202,4 +202,4 @@ private:
     std::map<int, std::vector<std::string>> mImageIdToCanvasStatisticsKey;
 };
 
-TEV_NAMESPACE_END
+}

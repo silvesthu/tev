@@ -23,7 +23,7 @@
 using namespace args;
 using namespace std;
 
-TEV_NAMESPACE_BEGIN
+namespace tev {
 
 // Image viewer is a static variable to allow other
 // parts of the program to easily schedule operations
@@ -526,7 +526,7 @@ int mainFunc(const vector<string>& arguments) {
     return 0;
 }
 
-TEV_NAMESPACE_END
+}
 
 #ifdef _WIN32
 int wmain(int argc, wchar_t* argv[]) {
@@ -550,7 +550,7 @@ int main(int argc, char* argv[]) {
 #endif
         }
 
-        tev::mainFunc(arguments);
+        return tev::mainFunc(arguments);
     } catch (const exception& e) {
         tlog::error() << fmt::format("Uncaught exception: {}", e.what());
         return 1;

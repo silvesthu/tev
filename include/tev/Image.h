@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-TEV_NAMESPACE_BEGIN
+namespace tev {
 
 class ImageLoader;
 
@@ -122,6 +122,10 @@ struct ImageData {
 struct ChannelGroup {
     std::string name;
     std::vector<std::string> channels;
+
+    bool operator==(const ChannelGroup& other) const {
+        return name == other.name;
+    }
 };
 
 struct ImageTexture {
@@ -180,6 +184,8 @@ public:
     nanogui::Texture* texture(const std::vector<std::string>& channelNames);
 
     std::vector<std::string> channelsInGroup(const std::string& groupName) const;
+    void decomposeChannelGroup(const std::string& groupName);
+
     std::vector<std::string> getSortedChannels(const std::string& layerName) const;
     std::vector<std::string> getExistingChannels(const std::vector<std::string>& requestedChannels) const;
 
@@ -336,4 +342,12 @@ private:
     std::set<PathAndChannelSelector> mFilesFoundInDirectories;
 };
 
-TEV_NAMESPACE_END
+}
+
+namespace std {
+template <> struct hash<tev::ChannelGroup> {
+    size_t operator()(const tev::ChannelGroup& g) const {
+        return hash<string>()(g.name);
+    }
+};
+}

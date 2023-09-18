@@ -8,7 +8,7 @@
 
 #include <istream>
 
-TEV_NAMESPACE_BEGIN
+namespace tev {
 
 class DdsImageLoader : public ImageLoader {
 public:
@@ -23,4 +23,4 @@ public:
     }
 };
 
-TEV_NAMESPACE_END
+}

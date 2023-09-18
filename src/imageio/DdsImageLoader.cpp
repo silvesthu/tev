@@ -13,7 +13,7 @@
 using namespace nanogui;
 using namespace std;
 
-TEV_NAMESPACE_BEGIN
+namespace tev {
 
 DdsImageLoader::DdsImageLoader()
 {
@@ -303,4 +303,4 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
     co_return result;
 }
 
-TEV_NAMESPACE_END
+}

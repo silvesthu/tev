@@ -23,7 +23,7 @@
 using namespace nanogui;
 using namespace std;
 
-TEV_NAMESPACE_BEGIN
+namespace tev {
 
 class StdIStream: public Imf::IStream
 {
@@ -332,4 +332,4 @@ Task<vector<ImageData>> ExrImageLoader::load(istream& iStream, const fs::path& p
     co_return result;
 }
 
-TEV_NAMESPACE_END
+}

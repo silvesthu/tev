@@ -13,8 +13,8 @@ cmake \
     -DCMAKE_OSX_SYSROOT=/Users/tom94/Projects/MacOSX-SDKs/MacOSX10.14.sdk/ \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=10.14 \
     -DTEV_DEPLOY=1 \
-    ../..
-make -j
+    ../.. || exit 1
+make -j || exit 1
 cd ..
 
 echo "Creating dmg..."

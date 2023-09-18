@@ -13,7 +13,7 @@
 #include <tuple>
 #include <string>
 
-TEV_NAMESPACE_BEGIN
+namespace tev {
 
 class ImageLoader {
 public:
@@ -36,4 +36,4 @@ protected:
 #endif // [DDS]
 };
 
-TEV_NAMESPACE_END
+}

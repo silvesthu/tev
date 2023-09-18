@@ -1,9 +1,11 @@
 # Build artifacts
 /build
 /x64
+_CPack_Packages
 
-# Automatically generated files by .vscode
+# Automatically generated files by IDE
 /.vscode
+/.cache
 
 # Python cache
 __pycache__

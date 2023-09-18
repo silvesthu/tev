@@ -16,6 +16,7 @@
 #include <functional>
 #include <string>
 #include <sstream>
+#include <unordered_set>
 #include <vector>
 
 #ifdef _WIN32
@@ -34,11 +35,6 @@
 #define SYSTEM_COMMAND_LEFT GLFW_KEY_LEFT_CONTROL
 #define SYSTEM_COMMAND_RIGHT GLFW_KEY_RIGHT_CONTROL
 #endif
-
-// A macro is used such that external tools won't end up indenting entire files,
-// resulting in wasted horizontal space.
-#define TEV_NAMESPACE_BEGIN namespace tev {
-#define TEV_NAMESPACE_END }
 
 #ifdef __GNUC__
 #   define LIKELY(condition) __builtin_expect(static_cast<bool>(condition), 1)
@@ -180,7 +176,7 @@ namespace nanogui {
     }
 }
 
-TEV_NAMESPACE_BEGIN
+namespace tev {
 
 namespace fs = std::filesystem;
 
@@ -221,6 +217,22 @@ std::string ensureUtf8(const std::string& str);
 std::string utf16to8(const std::wstring& utf16);
 fs::path toPath(const std::string& utf8);
 std::string toString(const fs::path& path);
+
+template <typename T>
+void removeDuplicates(std::vector<T>& vec) {
+    std::unordered_set<T> tmp;
+    size_t idx = 0;
+    for (const auto& v : vec) {
+        if (tmp.contains(v)) {
+            continue;
+        }
+
+        tmp.insert(v);
+        vec[idx++] = v;
+    }
+
+    vec.resize(idx);
+}
 
 // Taken from https://en.wikibooks.org/wiki/Algorithm_Implementation/Strings/Levenshtein_distance#C++
 template<typename T>
@@ -397,4 +409,4 @@ void redrawWindow();
 static const nanogui::Color IMAGE_COLOR = {0.35f, 0.35f, 0.8f, 1.0f};
 static const nanogui::Color REFERENCE_COLOR = {0.7f, 0.4f, 0.4f, 1.0f};
 
-TEV_NAMESPACE_END
+}

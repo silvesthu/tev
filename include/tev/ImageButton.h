@@ -6,10 +6,11 @@
 #include <tev/Common.h>
 
 #include <nanogui/widget.h>
+#include <nanogui/textbox.h>
 
 #include <string>
 
-TEV_NAMESPACE_BEGIN
+namespace tev {
 
 class ImageButton : public nanogui::Widget {
 public:
@@ -21,8 +22,29 @@ public:
 
     void draw(NVGcontext *ctx) override;
 
+    void set_theme(nanogui::Theme* theme) override {
+        nanogui::Widget::set_theme(theme);
+
+        nanogui::Theme* captionTextBoxTheme = new nanogui::Theme(*theme);
+        captionTextBoxTheme->m_text_box_font_size = m_font_size;
+        captionTextBoxTheme->m_text_color = nanogui::Color(255, 255);
+        mCaptionTextBox->set_theme(captionTextBoxTheme);
+    }
+
     const std::string& caption() const {
         return mCaption;
+    }
+
+    void setCaption(const std::string& caption) {
+        mCaption = caption;
+        // Reset drawing state
+        mSizeForWhichCutoffWasComputed = {0};
+        mHighlightBegin = 0;
+        mHighlightEnd = 0;
+
+        if (mCaptionChangeCallback) {
+            mCaptionChangeCallback();
+        }
     }
 
     void setReferenceCallback(const std::function<void(bool)> &callback) {
@@ -41,6 +63,10 @@ public:
         mSelectedCallback = callback;
     }
 
+    void setCaptionChangeCallback(const std::function<void()> &callback) {
+        mCaptionChangeCallback = callback;
+    }
+
     void setIsSelected(bool isSelected) {
         mIsSelected = isSelected;
     }
@@ -55,8 +81,17 @@ public:
 
     void setHighlightRange(size_t begin, size_t end);
 
+    void showTextBox();
+    void hideTextBox();
+
+    bool textBoxVisible() const {
+        return mCaptionTextBox->visible();
+    }
+
 private:
     std::string mCaption;
+    nanogui::TextBox* mCaptionTextBox;
+
     bool mCanBeReference;
 
     bool mIsReference = false;
@@ -64,6 +99,8 @@ private:
 
     bool mIsSelected = false;
     std::function<void()> mSelectedCallback;
+
+    std::function<void()> mCaptionChangeCallback;
 
     size_t mId = 0;
     size_t mCutoff = 0;
@@ -73,4 +110,4 @@ private:
     size_t mHighlightEnd = 0;
 };
 
-TEV_NAMESPACE_END
+}

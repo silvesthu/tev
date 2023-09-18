@@ -7,7 +7,7 @@
 #include <nanogui/texture.h>
 #include <nanogui/vector.h>
 
-TEV_NAMESPACE_BEGIN
+namespace tev {
 
 class UberShader {
 public:
@@ -84,4 +84,4 @@ private:
     nanogui::Color mBackgroundColor = nanogui::Color(0, 0, 0, 0);
 };
 
-TEV_NAMESPACE_END
+}
