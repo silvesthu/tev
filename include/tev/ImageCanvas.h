@@ -182,6 +182,11 @@ private:
     float mGamma = 1.0f;
 #endif // [DDS]
 
+#if 1 // [DDS]
+    nanogui::Vector2i mNanoPos;
+    std::vector<float> mValuesAtNanoPos;
+#endif // [DDS]
+
     bool mClipToLdr = false;
 
     std::shared_ptr<Image> mImage;

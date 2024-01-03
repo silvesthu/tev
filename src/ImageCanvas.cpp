@@ -452,6 +452,48 @@ void ImageCanvas::draw(NVGcontext* ctx) {
         ) {
             drawCoordinateSystem(ctx);
         }
+
+#if 1 // [DDS]
+        // If a hotkey is held, draw it!
+        if (
+            glfwGetKey(screen()->glfw_window(), GLFW_KEY_T)
+        ) {
+            nvgSave(ctx);
+
+            nvgFontFace(ctx, "sans");
+            nvgFontSize(ctx, 20.0f);
+            nvgTextAlign(ctx, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+            Vector2i pos = absolute_position() + mNanoPos + Vector2i(0, 40);
+
+            {
+                vector<string> channels = mImage->channelsInGroup(mRequestedChannelGroup);
+                // Remove duplicates
+                channels.erase(unique(begin(channels), end(channels)), end(channels));
+
+                vector<Color> colors;
+                for (const auto& channel : channels) {
+                    colors.emplace_back(Channel::color(channel));
+                }
+
+                {
+                    auto imageCoords = getImageCoords(*mImage, mNanoPos);
+                    string str = fmt::format("{}, {}", imageCoords.x(), imageCoords.y());
+                    Color col = Channel::color("");
+                    nvgFillColor(ctx, Color(col.r(), col.g(), col.b(), 1.0f));
+                    drawTextWithShadow(ctx, pos.x(), pos.y() + 0 * 20.0f, str, 1.0f);
+                }
+
+                for (size_t i = 0; i < colors.size(); ++i) {
+                    string str = fmt::format("{:.8f}", mValuesAtNanoPos[i]);
+                    Color col = colors[i];
+                    nvgFillColor(ctx, Color(col.r(), col.g(), col.b(), 1.0f));
+                    drawTextWithShadow(ctx, pos.x(), pos.y() + (i + 1) * 20.0f, str, 1.0f);
+                }
+            }
+
+            nvgRestore(ctx);
+        }
+#endif // [DDS]
     }
 
     // If we're not in fullscreen mode draw an inner drop shadow. (adapted from Window)
@@ -520,6 +562,11 @@ void ImageCanvas::getValuesAtNanoPos(Vector2i nanoPos, vector<float>& result, co
             result[i] = isAlpha ? 0.5f * (result[i] + reference) : applyMetric(result[i], reference);
         }
     }
+
+#if 1 // [DDS]
+    mNanoPos = nanoPos;
+    mValuesAtNanoPos = result;
+#endif // [DDS]
 }
 
 Vector3f ImageCanvas::applyTonemap(const Vector3f& value, float gamma, ETonemap tonemap) {
