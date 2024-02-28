@@ -97,7 +97,7 @@ ImageViewer::ImageViewer(
 #if 0 // [DDS]
             mExposureSlider->set_range({-5.0f, 5.0f});
 #else
-            mExposureSlider->set_range({ -10.0f, 10.0f });
+            mExposureSlider->set_range({ -20.0f, 20.0f });
 #endif // [DDS]
 
             mExposureSlider->set_callback([this](float value) {
