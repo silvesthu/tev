@@ -90,11 +90,16 @@ Task<vector<ImageData>> StbiImageLoader::load(istream& iStream, const fs::path& 
     resultData.hasPremultipliedAlpha = false;
 
 #if 1 // [DDS]
-    bool is16bit = stbi_is_16_bit_from_callbacks(&callbacks, &iStream) != 0;
+    bool is_16bit = stbi_is_16_bit_from_callbacks(&callbacks, &iStream) != 0;
+    resultData.format = isHdr ? "HDR (32-bit_rle_rgbe)" : (is_16bit ? "16bit" : "8bit");
     iStream.clear();
     iStream.seekg(0);
 
-    resultData.format = is16bit ? "16bit" : "8bit";
+    bool is_hdr = stbi_is_hdr_from_callbacks(&callbacks, &iStream) != 0;
+    if (is_hdr)
+        resultData.sRGB = false;
+    iStream.clear();
+    iStream.seekg(0);
 #endif // [DDS]
 
     co_return result;

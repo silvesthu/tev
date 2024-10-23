@@ -233,6 +233,10 @@ private:
 
     nanogui::Widget* mChannelButtonContainer;
 
+#if 1 // [DDS]
+    nanogui::Button* mSRGBButton = nullptr;
+#endif // // [DDS]
+
     nanogui::TextBox* mFilter;
     nanogui::Button* mRegexButton;
 

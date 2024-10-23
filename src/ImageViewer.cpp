@@ -375,7 +375,7 @@ ImageViewer::ImageViewer(
         // Channels
         {
             mChannelButtonContainer = new Widget{ mSidebarLayout };
-            mChannelButtonContainer->set_layout(new GridLayout{ Orientation::Horizontal, 4, Alignment::Fill, 5, 2 });
+            mChannelButtonContainer->set_layout(new GridLayout{ Orientation::Horizontal, 5, Alignment::Fill, 5, 2 });
 
             auto makeChannelButton = [&](const string& name, function<void(bool)> callback) {
                 auto button = new Button{ mChannelButtonContainer, name };
@@ -391,6 +391,26 @@ ImageViewer::ImageViewer(
             makeChannelButton("A", [this](bool) { setChannel(EChannel::ChannelA, false); });
 
             setChannel(EChannel::ChannelRGB, true);
+
+            {
+                mSRGBButton = new Button{ mChannelButtonContainer, "sRGB" };
+                mSRGBButton->set_flags(Button::Flags::ToggleButton);
+                mSRGBButton->set_font_size(15);
+                mSRGBButton->set_change_callback([this](bool state) { mImageCanvas->setShowSRGB(state); mCurrentImage->bumpId(); });
+                mSRGBButton->set_enabled(false);
+                mSRGBButton->set_tooltip(
+                    "tev [DDS] always store value as linear internally\n"
+                    "sRGB value is converted to linear on load\n\n"
+
+                    "Enable: show sRGB value, as in mspaint etc.\n"
+                    "Disable: show linear value, as in shader etc.\n\n"
+
+                    "Note some workflow store linear value in sRGB format (e.g. png).\n"
+                    "Enable this to show the original value stored.\n\n"
+
+                    "Visualization is not affected by this button."
+                );
+            };
         }
 #endif // [DDS]
 
@@ -1542,6 +1562,10 @@ void ImageViewer::selectImage(const shared_ptr<Image>& image, bool stopPlayback)
     // group isn't found.
     selectGroup(mCurrentGroup);
 
+#if 1 // [DDS]
+    mSRGBButton->set_enabled(image->sRGB());
+#endif // [DDS]
+
     // Ensure the currently active image button is always fully on-screen
     Widget* activeImageButton = nullptr;
     for (Widget* widget : mImageButtonContainer->children()) {
@@ -2110,9 +2134,10 @@ void ImageViewer::updateTitle() {
         );
 #else
 		caption = fmt::format(
-            "{} – {} – {}%",
+            "{} – {}{} – {}%",
             mCurrentImage->shortName(),
             mCurrentImage->format(),
+            mCurrentImage->sRGB() ? " sRGB" : "",
             (int)std::round(mImageCanvas->scale() * 100)
         );
 #endif // [DDS]
@@ -2127,7 +2152,10 @@ void ImageViewer::updateTitle() {
 #if 0 // [DDS]
             valuesString += fmt::format("{:.2f},", values[i]);
 #else
-            valuesString += fmt::format("{:.8f},", values[i]);
+            float value = values[i];
+            if (mSRGBButton->pushed() && mCurrentImage->sRGB())
+                value = toSRGB(value);
+            valuesString += fmt::format("{:.8f},", value);
 #endif // [DDS]
         }
         valuesString.pop_back();

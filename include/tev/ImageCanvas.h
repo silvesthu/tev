@@ -50,6 +50,12 @@ public:
         mGamma = gamma;
     }
 
+#if 1 // [DDS]
+    void setShowSRGB(bool show_srgb) {
+        mShowSRGB = show_srgb;
+    }
+#endif // [DDS]
+
     float applyExposureAndOffset(float value) const;
 
     void setImage(std::shared_ptr<Image> image) {
@@ -149,7 +155,7 @@ private:
         std::shared_ptr<Image> reference,
         const std::string& requestedChannelGroup,
         EMetric metric,
-        int priority
+        int priority, bool show_srgb /* [DDS] */
     );
 
     static Task<std::shared_ptr<CanvasStatistics>> computeCanvasStatistics(
@@ -157,7 +163,7 @@ private:
         std::shared_ptr<Image> reference,
         const std::string& requestedChannelGroup,
         EMetric metric,
-        int priority
+        int priority, bool show_srgb /* [DDS] */
     );
 
     void drawPixelValuesAsText(NVGcontext *ctx);
@@ -183,6 +189,7 @@ private:
 #endif // [DDS]
 
 #if 1 // [DDS]
+    bool mShowSRGB = false;
     nanogui::Vector2i mNanoPos;
     std::vector<float> mValuesAtNanoPos;
 #endif // [DDS]

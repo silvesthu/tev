@@ -158,28 +158,51 @@ void ImageCanvas::drawPixelValuesAsText(NVGcontext* ctx) {
 
                 TEV_ASSERT(values.size() >= colors.size(), "Can not have more values than channels.");
 
+#if 1 // [DDS]
+                bool show_srgb = mShowSRGB && mImage->sRGB();
+#endif // [DDS]
+
                 for (size_t i = 0; i < colors.size(); ++i) {
                     string str;
                     Vector2f pos;
 
                     if (shiftAndControlHeld) {
-#if 0 // [DDS]
-                        float tonemappedValue = Channel::tail(channels[i]) == "A" ? values[i] : toSRGB(values[i]);
-#else
-                        float tonemappedValue = values[i];
-#endif // [DDS]
-                        unsigned char discretizedValue = (char)(tonemappedValue * 255 + 0.5f);
-                        str = fmt::format("{:02X}", discretizedValue);
 
+                        float tonemappedValue = Channel::tail(channels[i]) == "A" ? values[i] : toSRGB(values[i]);
+
+#if 1 // [DDS]
+                        if (!show_srgb)
+                            tonemappedValue = values[i];
+#endif // [DDS]
+
+                        unsigned char discretizedValue = (char)(tonemappedValue * 255 + 0.5f);
+#if 1 // DDS
+                        str = fmt::format("{} : {:02X}", discretizedValue, discretizedValue);
+#else
+                        str = fmt::format("{:02X}", discretizedValue);
+#endif // [DDS]
+
+#if 1 // [DDS]
+                        // New line
+                        pos = Vector2f{
+                            (float)m_pos.x() + nano.x(),
+                            m_pos.y() + nano.y() + (i - 0.5f * (colors.size() - 1)) * fontSize,
+                        };
+#else
                         pos = Vector2f{
                             m_pos.x() + nano.x() + (i - 0.5f * (colors.size() - 1)) * fontSize * 0.88f,
                             (float)m_pos.y() + nano.y(),
                         };
+#endif // [DDS]
                     } else {
 #if 0 // [DDS]
                         str = std::abs(values[i]) > 100000 ? fmt::format("{:6g}", values[i]) : fmt::format("{:.5f}", values[i]);
 #else
-                        str = fmt::format("{:.8f}", values[i]);
+                        float tonemappedValue = Channel::tail(channels[i]) == "A" ? values[i] : toSRGB(values[i]);
+                        if (!show_srgb)
+                            tonemappedValue = values[i];
+
+                        str = fmt::format("{:.8f}", tonemappedValue);
 #endif // [DDS]
 
                         pos = Vector2f{
@@ -634,7 +657,7 @@ std::vector<float> ImageCanvas::getHdrImageData(bool divideAlpha, int priority) 
         return result;
     }
 
-    const auto& channels = channelsFromImages(mImage, mReference, mRequestedChannelGroup, mMetric, priority);
+    const auto& channels = channelsFromImages(mImage, mReference, mRequestedChannelGroup, mMetric, priority, false /* [DDS] */);
     auto numPixels = mImage->numPixels();
 
     if (channels.empty()) {
@@ -780,6 +803,10 @@ shared_ptr<Lazy<shared_ptr<CanvasStatistics>>> ImageCanvas::canvasStatistics() {
     auto requestedChannelGroup = mRequestedChannelGroup;
     auto metric = mMetric;
 
+#if 1 // [DDS]
+    auto show_srgb = mShowSRGB;
+#endif // [DDS]
+
     promise<shared_ptr<CanvasStatistics>> promise;
     mCanvasStatistics.insert(make_pair(key, make_shared<Lazy<shared_ptr<CanvasStatistics>>>(promise.get_future())));
 
@@ -794,9 +821,9 @@ shared_ptr<Lazy<shared_ptr<CanvasStatistics>>> ImageCanvas::canvasStatistics() {
         mReference->setStaleIdCallback([this](int id) { purgeCanvasStatistics(id); });
     }
 
-    invokeTaskDetached([image, reference, requestedChannelGroup, metric, priority, p=std::move(promise)]() mutable -> Task<void> {
+    invokeTaskDetached([image, reference, requestedChannelGroup, metric, priority, show_srgb /* [DDS] */, p=std::move(promise)]() mutable -> Task<void> {
         co_await ThreadPool::global().enqueueCoroutine(priority);
-        p.set_value(co_await computeCanvasStatistics(image, reference, requestedChannelGroup, metric, priority));
+        p.set_value(co_await computeCanvasStatistics(image, reference, requestedChannelGroup, metric, priority, show_srgb /* [DDS] */));
     });
 
     return mCanvasStatistics.at(key);
@@ -815,11 +842,15 @@ vector<Channel> ImageCanvas::channelsFromImages(
     shared_ptr<Image> reference,
     const string& requestedChannelGroup,
     EMetric metric,
-    int priority
+    int priority, bool show_srgb /* [DDS] */
 ) {
     if (!image) {
         return {};
     }
+
+#if 1 // [DDS]
+    auto DDS_post_eval = [&](float e, const Image* i)  { return show_srgb && i->sRGB() ? toSRGB(e) : e; };
+#endif // [DDS]
 
     vector<Channel> result;
     auto channelNames = image->channelsInGroup(requestedChannelGroup);
@@ -831,7 +862,7 @@ vector<Channel> ImageCanvas::channelsFromImages(
         ThreadPool::global().parallelFor(0, (int)channelNames.size(), [&](int i) {
             const auto* channel = image->channel(channelNames[i]);
             for (size_t j = 0; j < channel->numPixels(); ++j) {
-                result[i].at(j) = channel->eval(j);
+                result[i].at(j) = DDS_post_eval(channel->eval(j), image.get() /* [DDS] */);
             }
         }, priority);
     } else {
@@ -852,8 +883,8 @@ vector<Channel> ImageCanvas::channelsFromImages(
                 for (int y = 0; y < size.y(); ++y) {
                     for (int x = 0; x < size.x(); ++x) {
                         result[i].at({x, y}) = 0.5f * (
-                            channel->eval({x, y}) +
-                            (referenceChannel ? referenceChannel->eval({x + offset.x(), y + offset.y()}) : 1.0f)
+                            DDS_post_eval(channel->eval({x, y}), image.get() /* [DDS] */) +
+                            (referenceChannel ? DDS_post_eval(referenceChannel->eval({x + offset.x(), y + offset.y()}), reference.get() /* [DDS] */) : 1.0f)
                         );
                     }
                 }
@@ -861,8 +892,8 @@ vector<Channel> ImageCanvas::channelsFromImages(
                 for (int y = 0; y < size.y(); ++y) {
                     for (int x = 0; x < size.x(); ++x) {
                         result[i].at({x, y}) = ImageCanvas::applyMetric(
-                            channel->eval({x, y}),
-                            referenceChannel ? referenceChannel->eval({x + offset.x(), y + offset.y()}) : 0.0f,
+                            DDS_post_eval(channel->eval({x, y}), image.get() /* [DDS] */),
+                            referenceChannel ? DDS_post_eval(referenceChannel->eval({x + offset.x(), y + offset.y()}), reference.get() /* [DDS] */) : 0.0f,
                             metric
                         );
                     }
@@ -879,9 +910,9 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
     std::shared_ptr<Image> reference,
     const string& requestedChannelGroup,
     EMetric metric,
-    int priority
+    int priority, bool show_srgb /* [DDS] */
 ) {
-    auto flattened = channelsFromImages(image, reference, requestedChannelGroup, metric, priority);
+    auto flattened = channelsFromImages(image, reference, requestedChannelGroup, metric, priority, show_srgb /* [DDS] */);
 
     float mean = 0;
     float maximum = -numeric_limits<float>::infinity();

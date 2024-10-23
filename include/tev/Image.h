@@ -166,6 +166,12 @@ public:
         return mData.format;
     }
 
+#if 1 // [DDS]
+    bool sRGB() const {
+        return mData.sRGB;
+    }
+#endif // [DDS]
+
     bool hasChannel(const std::string& channelName) const {
         return mData.hasChannel(channelName);
     }
