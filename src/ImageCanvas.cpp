@@ -731,6 +731,49 @@ std::vector<char> ImageCanvas::getLdrImageData(bool divideAlpha, int priority) c
     return result;
 }
 
+#if 1 // [DDS]
+std::vector<char> ImageCanvas::getLdrImageDataClip() const
+{
+    std::vector<char> result;
+
+    if (!mImage) {
+        return result;
+    }
+
+    const int priority = std::numeric_limits<int>::max();
+
+    auto numPixels = mImage->numPixels();
+    auto floatData = getHdrImageData(false, priority);
+
+    // Store as LDR image.
+    result.resize(floatData.size());
+
+    ThreadPool::global().parallelFor<size_t>(0, numPixels, [&](size_t i) {
+        size_t start = 4 * i;
+#if 1 // [DDS]
+        // Copy as it is
+#else
+        Vector3f value = applyTonemap({
+            applyExposureAndOffset(floatData[start]),
+            applyExposureAndOffset(floatData[start + 1]),
+            applyExposureAndOffset(floatData[start + 2]),
+            });
+        for (int j = 0; j < 3; ++j) {
+            floatData[start + j] = value[j];
+        }
+#endif // [DDS]
+        for (int j = 0; j < 4; ++j) {
+            if (j != 3)
+                result[start + j] = (char)(floatData[start + j] * 255 + 0.5f);
+            else
+                result[start + j] = 0xff; // force max alpha
+        }
+        }, priority);
+
+    return result;
+}
+#endif // [DDS]
+
 void ImageCanvas::saveImage(const fs::path& path) const {
     if (!mImage) {
         return;

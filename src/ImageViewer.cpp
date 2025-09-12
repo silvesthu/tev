@@ -892,7 +892,11 @@ bool ImageViewer::keyboard_event(int key, int scancode, int action, int modifier
                 imageMetadata.blue_shift  = 16;
                 imageMetadata.alpha_shift = 24;
 
+#if 1 // [DDS]
+                auto imageData = mImageCanvas->getLdrImageDataClip();
+#else
                 auto imageData = mImageCanvas->getLdrImageData(true, std::numeric_limits<int>::max());
+#endif // [DDS]
                 clip::image image(imageData.data(), imageMetadata);
 
                 if (clip::set_image(image)) {
