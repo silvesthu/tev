@@ -1,4 +1,4 @@
-# tev — The EXR Viewer &nbsp;&nbsp; ![](https://github.com/silvesthu/tev/actions/workflows/main.yml/badge.svg?branch=DDS)
+# tev — The EXR Viewer &nbsp;&nbsp; ![](https://github.com/silvesthu/tev/actions/workflows/build_windows.yml/badge.svg?branch=DDS)
 
 This fork enhances DDS view.
 
