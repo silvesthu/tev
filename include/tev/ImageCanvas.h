@@ -73,6 +73,8 @@ public:
     void setBitCastType(EBitCastType bit_cast_type) {
         mBitCastType = bit_cast_type;
     }
+
+    int extractMipLevel(const std::string& groupName) const;
 #endif // [DDS]
 
     float applyExposureAndOffset(float value) const;

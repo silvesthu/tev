@@ -2301,6 +2301,16 @@ void ImageViewer::updateTitle() {
         nanogui::Vector2i imageCoords = mImageCanvas->getImageCoords(*mCurrentImage, {rel.x(), rel.y()});
         TEV_ASSERT(values.size() >= channelTails.size(), "Should obtain a value for every existing channel.");
 
+#if 1 // [DDS]
+        int mipLevel = mImageCanvas->extractMipLevel(mCurrentGroup);
+        int baseW = mCurrentImage->size().x();
+        int baseH = mCurrentImage->size().y();
+        int mipW = std::max(1, baseW >> mipLevel);
+        int mipH = std::max(1, baseH >> mipLevel);
+        int mipX = clamp(imageCoords.x() * mipW / std::max(1, baseW), 0, mipW - 1);
+        int mipY = clamp(imageCoords.y() * mipH / std::max(1, baseH), 0, mipH - 1);
+#endif // [DDS]
+
         string valuesString;
         for (size_t i = 0; i < channelTails.size(); ++i) {
 
@@ -2314,7 +2324,16 @@ void ImageViewer::updateTitle() {
         }
         valuesString.pop_back();
 
-#if 0 // [DDS]
+#if 1 // [DDS]
+        caption += fmt::format(
+            " – @{},{} / {}x{}: {}",
+            mipX,
+            mipY,
+            mipW,
+            mipH,
+            valuesString
+        );
+#else
         valuesString += " / 0x";
         for (size_t i = 0; i < channelTails.size(); ++i) {
 
@@ -2322,7 +2341,6 @@ void ImageViewer::updateTitle() {
             unsigned char discretizedValue = (char)(tonemappedValue * 255 + 0.5f);
             valuesString += fmt::format("{:02X}", discretizedValue);
         }
-#endif // [DDS]
 
         caption += fmt::format(
             " – @{},{} / {}x{}: {}",
@@ -2332,6 +2350,7 @@ void ImageViewer::updateTitle() {
             mCurrentImage->size().y(),
             valuesString
         );
+#endif // [DDS] 
     }
 
     set_caption(caption);

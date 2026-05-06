@@ -497,7 +497,20 @@ void ImageCanvas::draw(NVGcontext* ctx) {
 
                 {
                     auto imageCoords = getImageCoords(*mImage, mNanoPos);
-                    string str = fmt::format("{}, {}", imageCoords.x(), imageCoords.y());
+                    int cursorX = imageCoords.x();
+                    int cursorY = imageCoords.y();
+                    int mipLevel = extractMipLevel(mRequestedChannelGroup);
+
+                    if (mipLevel > 0) {
+                        int baseW = mImage->size().x();
+                        int baseH = mImage->size().y();
+                        int mipW = std::max(1, baseW >> mipLevel);
+                        int mipH = std::max(1, baseH >> mipLevel);
+                        cursorX = clamp(imageCoords.x() * mipW / std::max(1, baseW), 0, mipW - 1);
+                        cursorY = clamp(imageCoords.y() * mipH / std::max(1, baseH), 0, mipH - 1);
+                    }
+
+                    string str = fmt::format("{}, {}", cursorX, cursorY);
                     Color col = Channel::color("");
                     nvgFillColor(ctx, Color(col.r(), col.g(), col.b(), 1.0f));
                     drawTextWithShadow(ctx, pos.x(), pos.y() + 0 * 20.0f, str, 1.0f);
@@ -563,6 +576,17 @@ Vector2i ImageCanvas::getImageCoords(const Image& image, Vector2i nanoPos) {
         static_cast<int>(floor(imagePos.y())),
     };
 }
+
+#if 1 // [DDS]
+int ImageCanvas::extractMipLevel(const std::string& groupName) const {
+    // Match layerPrefix in DdsImageLoader
+    size_t mipTagPos = groupName.find(".M");
+    if (mipTagPos == string::npos || mipTagPos + 4 > groupName.size()) {
+        return 0;
+    }
+    return std::stoi(groupName.substr(mipTagPos + 2, 2));
+}
+#endif // [DDS]
 
 void ImageCanvas::getValuesAtNanoPos(Vector2i nanoPos, vector<float>& result, const vector<string>& channels) {
     result.clear();

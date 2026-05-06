@@ -413,30 +413,34 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
                     slice);
                 std::vector<Channel> channels = makeNChannels(numChannels, { (int)metadata.width, (int)metadata.height }, layerPrefix);
 
-                // Read the data as it is
-                size_t subresourceNumPixels = width * height;
-                co_await ThreadPool::global().parallelForAsync<size_t>(0, subresourceNumPixels, [&](size_t i) {
-                    size_t x = i % width;
-                    size_t y = i / width;
+                // Expand mip data to base resolution so each mip can be displayed at full image size.
+                size_t outputWidth = metadata.width;
+                size_t outputHeight = metadata.height;
+                size_t outputNumPixels = outputWidth * outputHeight;
+                co_await ThreadPool::global().parallelForAsync<size_t>(0, outputNumPixels, [&](size_t i) {
+                    size_t xOut = i % outputWidth;
+                    size_t yOut = i / outputWidth;
+                    size_t x = std::min(width - 1, xOut * width / outputWidth);
+                    size_t y = std::min(height - 1, yOut * height / outputHeight);
                     const uint8_t* rowPtr = pixels + y * rowPitch;
 
                     if (isDxgiUIntFormat(format)) {
                         const uint32_t* typedRow = reinterpret_cast<const uint32_t*>(rowPtr);
                         size_t baseIdx = x * numChannels;
                         for (int c = 0; c < numChannels; ++c) {
-                            channels[c].at({ (int)x, (int)y }) = std::bit_cast<float>(typedRow[baseIdx + c]);
+                            channels[c].at({ (int)xOut, (int)yOut }) = std::bit_cast<float>(typedRow[baseIdx + c]);
                         }
                     } else if (isDxgiSIntFormat(format)) {
                         const int32_t* typedRow = reinterpret_cast<const int32_t*>(rowPtr);
                         size_t baseIdx = x * numChannels;
                         for (int c = 0; c < numChannels; ++c) {
-                            channels[c].at({ (int)x, (int)y }) = std::bit_cast<float>(typedRow[baseIdx + c]);
+                            channels[c].at({ (int)xOut, (int)yOut }) = std::bit_cast<float>(typedRow[baseIdx + c]);
                         }
                     } else {
                         const float* typedRow = reinterpret_cast<const float*>(rowPtr);
                         size_t baseIdx = x * numChannels;
                         for (int c = 0; c < numChannels; ++c) {
-                            channels[c].at({ (int)x, (int)y }) = typedRow[baseIdx + c];
+                            channels[c].at({ (int)xOut, (int)yOut }) = typedRow[baseIdx + c];
                         }
                     }
                 }, priority);
