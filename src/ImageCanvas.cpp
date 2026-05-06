@@ -1135,6 +1135,22 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
     result->maximum = maximum;
     result->minimum = minimum;
 
+#if 1 // [DDS.UINT]
+    auto decodeHistogramValue = [&](float packedValue) -> double {
+        if (image->isUInt()) {
+            return static_cast<double>(image->decodePackedUInt(packedValue));
+        }
+        if (image->isSInt()) {
+            return static_cast<double>(image->decodePackedSInt(packedValue));
+        }
+        return static_cast<double>(packedValue);
+        };
+
+    // Calculate histogram with float
+    minimum = decodeHistogramValue(minimum);
+    maximum = decodeHistogramValue(maximum);
+#endif // [DDS.UINT]
+
     // Now that we know the maximum and minimum value we can define our histogram bin size.
     static const int NUM_BINS = 400;
     result->histogram.resize(NUM_BINS*nChannels);
@@ -1175,7 +1191,11 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
         const auto& channel = flattened[i];
         tasks.emplace_back(
             ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&, i](size_t j) {
+#if 1 // [DDS.UInt]
+                indices[j + i * numPixels] = valToBin(decodeHistogramValue(channel.eval(j)));
+#else
                 indices[j + i * numPixels] = valToBin(channel.eval(j));
+#endif // decodeHistogramValue
             }, priority)
         );
     }

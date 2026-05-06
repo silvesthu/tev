@@ -21,13 +21,13 @@ using namespace std;
 namespace tev {
 
 #if 1 // [DDS][DDS.UINT]
-static std::string formatGraphValue(float value, MultiGraph::EValueType valueType) {
-    switch (valueType) {
-        case MultiGraph::EValueType::UIntBitcast:
+static std::string formatGraphValue(float value, EBitCastType bitCastType) {
+    switch (bitCastType) {
+        case EBitCastType::UInt:
             return fmt::format("{}", std::bit_cast<uint32_t>(value));
-        case MultiGraph::EValueType::SIntBitcast:
+        case EBitCastType::SInt:
             return fmt::format("{}", std::bit_cast<int32_t>(value));
-        case MultiGraph::EValueType::Float:
+        case EBitCastType::Float:
         default:
             return fmt::format("{:.3f}", value);
     }
@@ -113,7 +113,7 @@ void MultiGraph::draw(NVGcontext *ctx) {
         nvgTextAlign(ctx, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
         nvgFillColor(ctx, mTextColor);
 #if 1 // [DDS][DDS.UINT]
-        drawTextWithShadow(ctx, m_pos.x() + 3, m_pos.y() + 1, formatGraphValue(mMinimum, mValueType));
+        drawTextWithShadow(ctx, m_pos.x() + 3, m_pos.y() + 1, formatGraphValue(mMinimum, mBitCastType));
 #else
         drawTextWithShadow(ctx, m_pos.x() + 3, m_pos.y() + 1, fmt::format("{:.3f}", mMinimum));
 #endif // [DDS][DDS.UINT]
@@ -127,7 +127,7 @@ void MultiGraph::draw(NVGcontext *ctx) {
         nvgTextAlign(ctx, NVG_ALIGN_RIGHT | NVG_ALIGN_TOP);
         nvgFillColor(ctx, mTextColor);
 #if 1 // [DDS][DDS.UINT]
-        drawTextWithShadow(ctx, m_pos.x() + m_size.x() - 3, m_pos.y() + 1, formatGraphValue(mMaximum, mValueType));
+        drawTextWithShadow(ctx, m_pos.x() + m_size.x() - 3, m_pos.y() + 1, formatGraphValue(mMaximum, mBitCastType));
 #else
         drawTextWithShadow(ctx, m_pos.x() + m_size.x() - 3, m_pos.y() + 1, fmt::format("{:.3f}", mMaximum));
 #endif // [DDS][DDS.UINT]

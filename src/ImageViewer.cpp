@@ -1286,11 +1286,13 @@ void ImageViewer::draw_contents() {
 
 #if 1 // [DDS.UINT]
             if (mCurrentImage && mCurrentImage->isUInt()) {
-                mHistogram->setValueType(MultiGraph::EValueType::UIntBitcast);
-            } else if (mCurrentImage && mCurrentImage->isSInt()) {
-                mHistogram->setValueType(MultiGraph::EValueType::SIntBitcast);
-            } else {
-                mHistogram->setValueType(MultiGraph::EValueType::Float);
+                mHistogram->setBitCastType(EBitCastType::UInt);
+            }
+            else if (mCurrentImage && mCurrentImage->isSInt()) {
+                mHistogram->setBitCastType(EBitCastType::SInt);
+            }
+            else {
+                mHistogram->setBitCastType(EBitCastType::Float);
             }
 
             std::string minStr = fmt::format("{:.3f}", statistics->minimum);
@@ -1334,7 +1336,7 @@ void ImageViewer::draw_contents() {
         mHistogram->setMaximum(0);
         mHistogram->setZero(0);
 #if 1 // [DDS.UINT]
-        mHistogram->setValueType(MultiGraph::EValueType::Float);
+        mHistogram->setBitCastType(EBitCastType::Float);
 #endif // [DDS.UINT]
         mHistogram->set_tooltip(
             fmt::format("{}", histogramTooltipBase)

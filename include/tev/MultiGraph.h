@@ -13,14 +13,6 @@ namespace tev {
 
 class MultiGraph : public nanogui::Widget {
 public:
-#if 1 // [DDS][DDS.UINT]
-    enum class EValueType {
-        Float,
-        UIntBitcast,
-        SIntBitcast,
-    };
-#endif // [DDS][DDS.UINT]
-
     MultiGraph(nanogui::Widget *parent, const std::string &caption = "Untitled");
 
     const std::string &caption() const { return mCaption; }
@@ -67,8 +59,8 @@ public:
     }
 
 #if 1 // [DDS][DDS.UINT]
-    void setValueType(EValueType valueType) {
-        mValueType = valueType;
+    void setBitCastType(EBitCastType bitCastType) {
+        mBitCastType = bitCastType;
     }
 #endif // [DDS][DDS.UINT]
 
@@ -81,7 +73,7 @@ protected:
     int mZeroBin = 0;
 
 #if 1 // [DDS][DDS.UINT]
-    EValueType mValueType = EValueType::Float;
+    EBitCastType mBitCastType = EBitCastType::Float;
 #endif // [DDS][DDS.UINT]
 };
 

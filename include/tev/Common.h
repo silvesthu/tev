@@ -385,6 +385,7 @@ enum EMetric : int {
 
 EMetric toMetric(std::string name);
 
+#if 1 // [DDS][DDS.UINT]
 enum EChannel : int {
     ChannelNone = 0,
     ChannelR = 1,
@@ -396,6 +397,14 @@ enum EChannel : int {
     ChannelRGBA = ChannelR | ChannelG | ChannelB | ChannelA,
     ChannelCount = 4,
 };
+
+enum EBitCastType : int
+{
+    Float = 0,
+    UInt,
+    SInt,
+};
+#endif // [DDS][DDS.UINT]
 
 enum EDirection {
     Forward,
