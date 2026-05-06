@@ -54,6 +54,10 @@ public:
     void setShowSRGB(bool show_srgb) {
         mShowSRGB = show_srgb;
     }
+
+    void setShowHex(bool show_hex) {
+        mShowHex = show_hex;
+    }
 #endif // [DDS]
 
     float applyExposureAndOffset(float value) const;
@@ -194,6 +198,7 @@ private:
 
 #if 1 // [DDS]
     bool mShowSRGB = false;
+    bool mShowHex = true;
     nanogui::Vector2i mNanoPos;
     std::vector<float> mValuesAtNanoPos;
 #endif // [DDS]

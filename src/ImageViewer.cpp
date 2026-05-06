@@ -393,22 +393,25 @@ ImageViewer::ImageViewer(
             setChannel(EChannel::ChannelRGB, true);
 
             {
-                mSRGBButton = new Button{ mChannelButtonContainer, "sRGB" };
-                mSRGBButton->set_flags(Button::Flags::ToggleButton);
-                mSRGBButton->set_font_size(15);
-                mSRGBButton->set_change_callback([this](bool state) { mImageCanvas->setShowSRGB(state); mCurrentImage->bumpId(); });
-                mSRGBButton->set_enabled(false);
-                mSRGBButton->set_tooltip(
-                    "tev [DDS] always store value as linear internally\n"
-                    "sRGB value is converted to linear on load\n\n"
+                mAltButton = new Button{ mChannelButtonContainer, "sRGB" };
+                mAltButton->set_flags(Button::Flags::ToggleButton);
+                mAltButton->set_font_size(15);
+                mAltButton->set_change_callback([this](bool state) {
+                    if (!mCurrentImage) {
+                        return;
+                    }
 
-                    "Enable: show sRGB value, as in mspaint etc.\n"
-                    "Disable: show linear value, as in shader etc.\n\n"
-
-                    "Note some workflow store linear value in sRGB format (e.g. png).\n"
-                    "Enable this to show the original value stored.\n\n"
-
-                    "Visualization is not affected by this button."
+                    bool isIntegerImage = mCurrentImage->isUInt() || mCurrentImage->isSInt();
+                    mImageCanvas->setShowHex(isIntegerImage && state);
+                    mImageCanvas->setShowSRGB(!isIntegerImage && state);
+                    mCurrentImage->bumpId();
+                });
+                mAltButton->set_pushed(true);
+                mAltButton->set_enabled(false);
+                mAltButton->set_tooltip(
+                    "Alt Mode to visualize image\n"
+                    "- sRGB: Show float values as sRGB\n"
+                    "- HEX: Show int values as HEX\n"
                 );
             };
         }
@@ -1566,9 +1569,15 @@ void ImageViewer::selectImage(const shared_ptr<Image>& image, bool stopPlayback)
     // group isn't found.
     selectGroup(mCurrentGroup);
 
-#if 1 // [DDS]
-    mSRGBButton->set_enabled(image->sRGB());
-#endif // [DDS]
+#if 1 // [DDS][DDS.UINT]
+    bool isIntegerImage = image->isUInt() || image->isSInt();
+    mAltButton->set_enabled(image->sRGB() || isIntegerImage);
+    mAltButton->set_caption(isIntegerImage ? "HEX" : "sRGB");
+
+    bool toggleState = mAltButton->pushed();
+    mImageCanvas->setShowHex(isIntegerImage && toggleState);
+    mImageCanvas->setShowSRGB(!isIntegerImage && toggleState);
+#endif // [DDS][DDS.UINT]
 
     // Ensure the currently active image button is always fully on-screen
     Widget* activeImageButton = nullptr;
@@ -2137,11 +2146,19 @@ void ImageViewer::updateTitle() {
             (int)std::round(mImageCanvas->scale() * 100)
         );
 #else
-		caption = fmt::format(
-            "{} – {}{} – {}%",
+        std::string dataType = "float";
+        if (mCurrentImage->isUInt()) {
+            dataType = "uint";
+        } else if (mCurrentImage->isSInt()) {
+            dataType = "int";
+        }
+
+        caption = fmt::format(
+            "{} – {}{} [{}] – {}%",
             mCurrentImage->shortName(),
             mCurrentImage->format(),
             mCurrentImage->sRGB() ? " sRGB" : "",
+            dataType,
             (int)std::round(mImageCanvas->scale() * 100)
         );
 #endif // [DDS]
@@ -2153,14 +2170,37 @@ void ImageViewer::updateTitle() {
 
         string valuesString;
         for (size_t i = 0; i < channelTails.size(); ++i) {
-#if 0 // [DDS]
+
+#if 0 // [DDS][DDS.UINT] 
             valuesString += fmt::format("{:.2f},", values[i]);
 #else
-            float value = values[i];
-            if (mSRGBButton->pushed() && mCurrentImage->sRGB())
-                value = toSRGB(value);
-            valuesString += fmt::format("{:.8f},", value);
-#endif // [DDS]
+            const Channel* c = mCurrentImage->channel(channels[i]);
+            if (!c) {
+                c = mCurrentImage->channel(channels[i], Channel::looseMatch);
+            }
+
+            float packedValue = c ? c->eval(imageCoords) : 0.0f;
+            if (mCurrentImage->isUInt()) {
+                if (mAltButton->pushed()) {
+                    valuesString += fmt::format("0x{:08X},", mCurrentImage->decodePackedUInt(packedValue));
+                } else {
+                    valuesString += fmt::format("{},", mCurrentImage->decodePackedUInt(packedValue));
+                }
+            } else if (mCurrentImage->isSInt()) {
+                if (mAltButton->pushed()) {
+                    valuesString += fmt::format("0x{:08X},", static_cast<uint32_t>(mCurrentImage->decodePackedSInt(packedValue)));
+                } else {
+                    valuesString += fmt::format("{},", mCurrentImage->decodePackedSInt(packedValue));
+                }
+            } else {
+                float value = values[i];
+                if (mAltButton->pushed() && mCurrentImage->sRGB()) {
+                    value = toSRGB(value);
+                }
+                valuesString += fmt::format("{:.8f},", value);
+            }
+#endif // [DDS][DDS.UINT]
+
         }
         valuesString.pop_back();
 

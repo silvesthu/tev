@@ -7,6 +7,7 @@
 #include <DirectXTex.h>
 
 #if 1 // [DDS]
+#include <bit>
 #include <nameof.hpp>
 #endif // [DDS]
 
@@ -418,13 +419,13 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
                         const uint32_t* typedRow = reinterpret_cast<const uint32_t*>(rowPtr);
                         size_t baseIdx = x * numChannels;
                         for (int c = 0; c < numChannels; ++c) {
-                            channels[c].at(i) = static_cast<float>(typedRow[baseIdx + c]);
+                            channels[c].at(i) = std::bit_cast<float>(typedRow[baseIdx + c]);
                         }
                     } else if (isDxgiSIntFormat(format)) {
                         const int32_t* typedRow = reinterpret_cast<const int32_t*>(rowPtr);
                         size_t baseIdx = x * numChannels;
                         for (int c = 0; c < numChannels; ++c) {
-                            channels[c].at(i) = static_cast<float>(typedRow[baseIdx + c]);
+                            channels[c].at(i) = std::bit_cast<float>(static_cast<uint32_t>(typedRow[baseIdx + c]));
                         }
                     } else {
                         const float* typedRow = reinterpret_cast<const float*>(rowPtr);
@@ -444,12 +445,10 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
 
     resultData.hasPremultipliedAlpha = scratchImage.GetMetadata().IsPMAlpha();
 
-#if 1 // [DDS]
-    // resultData.sRGB = isDxgiSrgbFormat(metadata.format) && !isDxgiUIntFormat(metadata.format) && !isDxgiSIntFormat(metadata.format);
-    // Treat all as non-SRGB for now
-    resultData.sRGB = false;
+#if 1 // [DDS][DDS.UINT]
+    resultData.sRGB = isDxgiSrgbFormat(metadata.format);
     resultData.format = fmt::format(" {} - {} Depth - {} Array - {} Mips", std::string(NAMEOF_ENUM(metadata.format)), metadata.depth, metadata.arraySize, metadata.mipLevels);
-#endif // [DDS]
+#endif // [DDS][DDS.UINT]
 
     co_return result;
 }

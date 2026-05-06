@@ -158,9 +158,10 @@ void ImageCanvas::drawPixelValuesAsText(NVGcontext* ctx) {
 
                 TEV_ASSERT(values.size() >= colors.size(), "Can not have more values than channels.");
 
-#if 1 // [DDS]
+#if 1 // [DDS][DDS.UINT]
                 bool show_srgb = mShowSRGB && mImage->sRGB();
-#endif // [DDS]
+                bool show_hex = mShowHex && (mImage->isUInt() || mImage->isSInt());
+#endif // [DDS][DDS.UINT]
 
                 for (size_t i = 0; i < colors.size(); ++i) {
                     string str;
@@ -195,15 +196,38 @@ void ImageCanvas::drawPixelValuesAsText(NVGcontext* ctx) {
                         };
 #endif // [DDS]
                     } else {
-#if 0 // [DDS]
+
+#if 0 // [DDS][DDS.UINT]
                         str = std::abs(values[i]) > 100000 ? fmt::format("{:6g}", values[i]) : fmt::format("{:.5f}", values[i]);
 #else
-                        float tonemappedValue = Channel::tail(channels[i]) == "A" ? values[i] : toSRGB(values[i]);
-                        if (!show_srgb)
-                            tonemappedValue = values[i];
+                        if (mImage->isUInt() || mImage->isSInt()) {
+                            const Channel* c = mImage->channel(channels[i]);
+                            if (!c) {
+                                c = mImage->channel(channels[i], Channel::looseMatch);
+                            }
 
-                        str = fmt::format("{:.8f}", tonemappedValue);
-#endif // [DDS]
+                            float packedValue = c ? c->eval(cur) : 0.0f;
+                            if (show_hex) {
+                                if (mImage->isUInt()) {
+                                    str = fmt::format("0x{:08X}", mImage->decodePackedUInt(packedValue));
+                                } else {
+                                    str = fmt::format("0x{:08X}", static_cast<uint32_t>(mImage->decodePackedSInt(packedValue)));
+                                }
+                            } else {
+                                if (mImage->isUInt()) {
+                                    str = fmt::format("{}", mImage->decodePackedUInt(packedValue));
+                                } else {
+                                    str = fmt::format("{}", mImage->decodePackedSInt(packedValue));
+                                }
+                            }
+                        } else {
+                            float tonemappedValue = Channel::tail(channels[i]) == "A" ? values[i] : toSRGB(values[i]);
+                            if (!show_srgb)
+                                tonemappedValue = values[i];
+
+                            str = fmt::format("{:.8f}", tonemappedValue);
+                        }
+#endif // [DDS][DDS.UINT]
 
                         pos = Vector2f{
                             (float)m_pos.x() + nano.x(),
@@ -564,7 +588,14 @@ void ImageCanvas::getValuesAtNanoPos(Vector2i nanoPos, vector<float>& result, co
     for (const auto& channel : channels) {
         const Channel* c = mImage->channel(channel);
         TEV_ASSERT(c, "Requested channel must exist.");
+
+// [DDS.UINT] 
+#if 0
         result.push_back(c->eval(imageCoords));
+#else
+        result.push_back(mImage->decodePackedValue(c->eval(imageCoords)));
+#endif // [DDS.UINT] 
+
     }
 
     // Subtract reference if it exists.
@@ -581,7 +612,13 @@ void ImageCanvas::getValuesAtNanoPos(Vector2i nanoPos, vector<float>& result, co
                 c = mReference->channel(channels[i], Channel::looseMatch);
 #endif // [DDS]
 
+// [DDS.UINT] 
+#if 0
             float reference = c ? c->eval(referenceCoords) : defaultVal;
+#else
+            float reference = c ? mReference->decodePackedValue(c->eval(referenceCoords)) : defaultVal;
+#endif // [DDS.UINT] 
+
             result[i] = isAlpha ? 0.5f * (result[i] + reference) : applyMetric(result[i], reference);
         }
     }
@@ -892,7 +929,17 @@ vector<Channel> ImageCanvas::channelsFromImages(
     }
 
 #if 1 // [DDS]
-    auto DDS_post_eval = [&](float e, const Image* i)  { return show_srgb && i->sRGB() ? toSRGB(e) : e; };
+    auto DDS_post_eval = [&](float e, const Image* i)  {
+
+// [DDS.UINT] 
+#if 0
+        return show_srgb && i->sRGB() ? toSRGB(e) : e;
+#else
+        float decoded = i->decodePackedValue(e);
+        return show_srgb && i->sRGB() ? toSRGB(decoded) : decoded;
+#endif // [DDS.UINT] 
+
+    };
 #endif // [DDS]
 
     vector<Channel> result;

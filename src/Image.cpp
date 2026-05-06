@@ -301,8 +301,16 @@ Texture* Image::texture(const vector<string>& channelNames) {
 #else
                 bool sRGB = mData.sRGB;
                 tasks.emplace_back(
-                    ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&channelData, &data, i, sRGB](size_t j) {
+                    ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&channelData, &data, i, sRGB, this](size_t j) {
+
+// [DDS.UINT] 
+#if 0
                         data[j * 4 + i] = sRGB ? toSRGB(channelData[j]) : channelData[j];
+#else
+                        float value = mData.decodePackedValue(channelData[j]);
+                        data[j * 4 + i] = sRGB ? toSRGB(value) : value;
+#endif // [DDS.UINT] 
+
                     }, std::numeric_limits<int>::max())
                 );
 #endif // [DDS]
