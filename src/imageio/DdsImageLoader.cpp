@@ -424,19 +424,19 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
                         const uint32_t* typedRow = reinterpret_cast<const uint32_t*>(rowPtr);
                         size_t baseIdx = x * numChannels;
                         for (int c = 0; c < numChannels; ++c) {
-                            channels[c].at(i) = std::bit_cast<float>(typedRow[baseIdx + c]);
+                            channels[c].at({ (int)x, (int)y }) = std::bit_cast<float>(typedRow[baseIdx + c]);
                         }
                     } else if (isDxgiSIntFormat(format)) {
                         const int32_t* typedRow = reinterpret_cast<const int32_t*>(rowPtr);
                         size_t baseIdx = x * numChannels;
                         for (int c = 0; c < numChannels; ++c) {
-                            channels[c].at(i) = std::bit_cast<float>(static_cast<uint32_t>(typedRow[baseIdx + c]));
+                            channels[c].at({ (int)x, (int)y }) = std::bit_cast<float>(typedRow[baseIdx + c]);
                         }
                     } else {
                         const float* typedRow = reinterpret_cast<const float*>(rowPtr);
                         size_t baseIdx = x * numChannels;
                         for (int c = 0; c < numChannels; ++c) {
-                            channels[c].at(i) = typedRow[baseIdx + c];
+                            channels[c].at({ (int)x, (int)y }) = typedRow[baseIdx + c];
                         }
                     }
                 }, priority);
