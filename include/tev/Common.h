@@ -404,6 +404,20 @@ enum EBitCastType : int
     UInt,
     SInt,
 };
+
+inline float BitCastTypeToFloat(float raw, EBitCastType bit_cast_type) {
+    switch (bit_cast_type) {
+    case EBitCastType::UInt:
+        return static_cast<float>(std::bit_cast<uint32_t>(raw));
+    case EBitCastType::SInt:
+        return static_cast<float>(std::bit_cast<int32_t>(raw));
+    case EBitCastType::Float:
+    default:
+        return raw;
+    }
+}
+
+std::string BitCastTypeToString(float raw, EBitCastType bit_cast_type, bool srgb, bool show_hex);
 #endif // [DDS][DDS.UINT]
 
 enum EDirection {

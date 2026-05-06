@@ -302,7 +302,7 @@ Texture* Image::texture(const vector<string>& channelNames) {
                 bool sRGB = mData.sRGB;
                 tasks.emplace_back(
                     ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&channelData, &data, i, sRGB, this](size_t j) {
-                        float value = mData.decodePackedValue(channelData[j]);
+                        float value = BitCastTypeToFloat(channelData[j], mData.bitCastType); // Convert to float for rendering
                         data[j * 4 + i] = sRGB ? toSRGB(value) : value;
                     }, std::numeric_limits<int>::max())
                 );

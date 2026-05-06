@@ -37,26 +37,10 @@ struct ImageData {
     bool hasPremultipliedAlpha;
 
 #if 1 // [DDS]
-    bool isSInt = false;
-    bool isUInt = false;
+    EBitCastType bitCastType = EBitCastType::Float;
     bool sRGB = true;
 
-    uint32_t decodePackedUInt(float packedValue) const {
-        return std::bit_cast<uint32_t>(packedValue);
-    }
 
-    int32_t decodePackedSInt(float packedValue) const {
-        return static_cast<int32_t>(std::bit_cast<uint32_t>(packedValue));
-    }
-
-    float decodePackedValue(float packedValue) const {
-        if (isUInt) {
-            return static_cast<float>(decodePackedUInt(packedValue));
-        } else if (isSInt) {
-            return static_cast<float>(decodePackedSInt(packedValue));
-        }
-        return packedValue;
-    }
 #endif // [DDS]
 
     using Surface = std::vector<Channel>;
@@ -188,29 +172,8 @@ public:
     }
 
 #if 1 // [DDS]
-    bool sRGB() const {
-        return mData.sRGB;
-    }
-
-    bool isUInt() const {
-        return mData.isUInt;
-    }
-
-    bool isSInt() const {
-        return mData.isSInt;
-    }
-
-    float decodePackedValue(float packedValue) const {
-        return mData.decodePackedValue(packedValue);
-    }
-
-    uint32_t decodePackedUInt(float packedValue) const {
-        return mData.decodePackedUInt(packedValue);
-    }
-
-    int32_t decodePackedSInt(float packedValue) const {
-        return mData.decodePackedSInt(packedValue);
-    }
+    bool sRGB() const { return mData.sRGB; }
+    EBitCastType bitCastType() const { return mData.bitCastType; }
 #endif // [DDS]
 
     bool hasChannel(const std::string& channelName) const {

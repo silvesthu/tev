@@ -1285,10 +1285,10 @@ void ImageViewer::draw_contents() {
             mHistogram->setZero(statistics->histogramZero);
 
 #if 1 // [DDS.UINT]
-            if (mCurrentImage && mCurrentImage->isUInt()) {
+            if (mCurrentImage && mCurrentImage->bitCastType() == EBitCastType::UInt) {
                 mHistogram->setBitCastType(EBitCastType::UInt);
             }
-            else if (mCurrentImage && mCurrentImage->isSInt()) {
+            else if (mCurrentImage && mCurrentImage->bitCastType() == EBitCastType::SInt) {
                 mHistogram->setBitCastType(EBitCastType::SInt);
             }
             else {
@@ -1298,10 +1298,10 @@ void ImageViewer::draw_contents() {
             std::string minStr = fmt::format("{:.3f}", statistics->minimum);
             std::string meanStr = fmt::format("{:.3f}", statistics->mean);
             std::string maxStr = fmt::format("{:.3f}", statistics->maximum);
-            if (mCurrentImage && mCurrentImage->isUInt()) {
+            if (mCurrentImage && mCurrentImage->bitCastType() == EBitCastType::UInt) {
                 minStr = fmt::format("{}", std::bit_cast<uint32_t>(statistics->minimum));
                 maxStr = fmt::format("{}", std::bit_cast<uint32_t>(statistics->maximum));
-            } else if (mCurrentImage && mCurrentImage->isSInt()) {
+            } else if (mCurrentImage && mCurrentImage->bitCastType() == EBitCastType::SInt) {
                 minStr = fmt::format("{}", std::bit_cast<int32_t>(statistics->minimum));
                 maxStr = fmt::format("{}", std::bit_cast<int32_t>(statistics->maximum));
             }
@@ -1700,9 +1700,8 @@ void ImageViewer::selectImage(const shared_ptr<Image>& image, bool stopPlayback)
     selectGroup(mCurrentGroup);
 
 #if 1 // [DDS][DDS.UINT]
-    bool isIntegerImage = image->isUInt() || image->isSInt();
-    bool srgbEnabled = image->sRGB() && !isIntegerImage;
-    bool hexEnabled = isIntegerImage;
+    bool srgbEnabled = image->sRGB();
+    bool hexEnabled = image->bitCastType() == EBitCastType::SInt || image->bitCastType() == EBitCastType::UInt;
 
     mSrgbButton->set_enabled(srgbEnabled);
     mHexButton->set_enabled(hexEnabled);
@@ -1717,10 +1716,11 @@ void ImageViewer::selectImage(const shared_ptr<Image>& image, bool stopPlayback)
 
     mImageCanvas->setShowSRGB(srgbEnabled && mSrgbButton->pushed());
     mImageCanvas->setShowHex(hexEnabled && mHexButton->pushed());
+    mImageCanvas->setBitCastType(image->bitCastType());
 
-    if (mMinMaxFloatPanel) mMinMaxFloatPanel->set_visible(!image->isUInt() && !image->isSInt());
-    if (mMinMaxSIntPanel) mMinMaxSIntPanel->set_visible(image->isSInt());
-    if (mMinMaxUIntPanel) mMinMaxUIntPanel->set_visible(image->isUInt());
+    if (mMinMaxFloatPanel) mMinMaxFloatPanel->set_visible(image->bitCastType() == EBitCastType::Float);
+    if (mMinMaxSIntPanel) mMinMaxSIntPanel->set_visible(image->bitCastType() == EBitCastType::SInt);
+    if (mMinMaxUIntPanel) mMinMaxUIntPanel->set_visible(image->bitCastType() == EBitCastType::UInt);
     requestLayoutUpdate();
 #endif // [DDS][DDS.UINT]
 
@@ -2289,30 +2289,12 @@ void ImageViewer::updateTitle() {
         auto channelTails = channels;
         transform(begin(channelTails), end(channelTails), begin(channelTails), Channel::tail);
 
-#if 0 // [DDS]
         caption = fmt::format(
             "{} – {} – {}%",
             mCurrentImage->shortName(),
             mCurrentGroup,
             (int)std::round(mImageCanvas->scale() * 100)
         );
-#else
-        std::string dataType = "float";
-        if (mCurrentImage->isUInt()) {
-            dataType = "uint";
-        } else if (mCurrentImage->isSInt()) {
-            dataType = "int";
-        }
-
-        caption = fmt::format(
-            "{} – {}{} [{}] – {}%",
-            mCurrentImage->shortName(),
-            mCurrentImage->format(),
-            mCurrentImage->sRGB() ? " sRGB" : "",
-            dataType,
-            (int)std::round(mImageCanvas->scale() * 100)
-        );
-#endif // [DDS]
 
         auto rel = mouse_pos() - mImageCanvas->position();
         vector<float> values = mImageCanvas->getValuesAtNanoPos({rel.x(), rel.y()}, channels);
@@ -2325,31 +2307,8 @@ void ImageViewer::updateTitle() {
 #if 0 // [DDS][DDS.UINT] 
             valuesString += fmt::format("{:.2f},", values[i]);
 #else
-            const Channel* c = mCurrentImage->channel(channels[i]);
-            if (!c) {
-                c = mCurrentImage->channel(channels[i], Channel::looseMatch);
-            }
-
-            float packedValue = c ? c->eval(imageCoords) : 0.0f;
-            if (mCurrentImage->isUInt()) {
-                if (mHexButton->pushed()) {
-                    valuesString += fmt::format("0x{:08X},", mCurrentImage->decodePackedUInt(packedValue));
-                } else {
-                    valuesString += fmt::format("{},", mCurrentImage->decodePackedUInt(packedValue));
-                }
-            } else if (mCurrentImage->isSInt()) {
-                if (mHexButton->pushed()) {
-                    valuesString += fmt::format("0x{:08X},", static_cast<uint32_t>(mCurrentImage->decodePackedSInt(packedValue)));
-                } else {
-                    valuesString += fmt::format("{},", mCurrentImage->decodePackedSInt(packedValue));
-                }
-            } else {
-                float value = values[i];
-                if (mSrgbButton->pushed() && mCurrentImage->sRGB()) {
-                    value = toSRGB(value);
-                }
-                valuesString += fmt::format("{:.8f},", value);
-            }
+            valuesString += BitCastTypeToString(values[i], mCurrentImage->bitCastType(), mImageCanvas->getShowSRGB() && !Channel::isAlpha(channels[i]), mImageCanvas->getShowHex());
+            valuesString += ",";
 #endif // [DDS][DDS.UINT]
 
         }

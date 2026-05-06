@@ -161,7 +161,7 @@ void ImageCanvas::drawPixelValuesAsText(NVGcontext* ctx) {
 
 #if 1 // [DDS][DDS.UINT]
                 bool show_srgb = mShowSRGB && mImage->sRGB();
-                bool show_hex = mShowHex && (mImage->isUInt() || mImage->isSInt());
+                bool show_hex = mShowHex && (mImage->bitCastType() != EBitCastType::Float);
 #endif // [DDS][DDS.UINT]
 
                 for (size_t i = 0; i < colors.size(); ++i) {
@@ -201,33 +201,7 @@ void ImageCanvas::drawPixelValuesAsText(NVGcontext* ctx) {
 #if 0 // [DDS][DDS.UINT]
                         str = std::abs(values[i]) > 100000 ? fmt::format("{:6g}", values[i]) : fmt::format("{:.5f}", values[i]);
 #else
-                        if (mImage->isUInt() || mImage->isSInt()) {
-                            const Channel* c = mImage->channel(channels[i]);
-                            if (!c) {
-                                c = mImage->channel(channels[i], Channel::looseMatch);
-                            }
-
-                            float packedValue = c ? c->eval(cur) : 0.0f;
-                            if (show_hex) {
-                                if (mImage->isUInt()) {
-                                    str = fmt::format("0x{:08X}", mImage->decodePackedUInt(packedValue));
-                                } else {
-                                    str = fmt::format("0x{:08X}", static_cast<uint32_t>(mImage->decodePackedSInt(packedValue)));
-                                }
-                            } else {
-                                if (mImage->isUInt()) {
-                                    str = fmt::format("{}", mImage->decodePackedUInt(packedValue));
-                                } else {
-                                    str = fmt::format("{}", mImage->decodePackedSInt(packedValue));
-                                }
-                            }
-                        } else {
-                            float tonemappedValue = Channel::tail(channels[i]) == "A" ? values[i] : toSRGB(values[i]);
-                            if (!show_srgb)
-                                tonemappedValue = values[i];
-
-                            str = fmt::format("{:.8f}", tonemappedValue);
-                        }
+                        str = BitCastTypeToString(values[i], mImage->bitCastType(), show_srgb && !Channel::isAlpha(channels[i]), show_hex);
 #endif // [DDS][DDS.UINT]
 
                         pos = Vector2f{
@@ -530,7 +504,7 @@ void ImageCanvas::draw(NVGcontext* ctx) {
                 }
 
                 bool show_srgb = mShowSRGB && mImage->sRGB();
-                bool show_hex = mShowHex && (mImage->isUInt() || mImage->isSInt());
+                bool show_hex = mShowHex && (mImage->bitCastType() != EBitCastType::Float);
 
                 for (size_t i = 0; i < colors.size(); ++i) {
                     string str;
@@ -541,26 +515,8 @@ void ImageCanvas::draw(NVGcontext* ctx) {
                         c = mImage->channel(channels[i], Channel::looseMatch);
                     }
 
-                    float packedValue = c ? c->eval(imageCoords) : 0.0f;
-                    if (mImage->isUInt()) {
-                        if (show_hex) {
-                            str = fmt::format("0x{:08X}", mImage->decodePackedUInt(packedValue));
-                        } else {
-                            str = fmt::format("{}", mImage->decodePackedUInt(packedValue));
-                        }
-                    } else if (mImage->isSInt()) {
-                        if (show_hex) {
-                            str = fmt::format("0x{:08X}", static_cast<uint32_t>(mImage->decodePackedSInt(packedValue)));
-                        } else {
-                            str = fmt::format("{}", mImage->decodePackedSInt(packedValue));
-                        }
-                    } else {
-                        float value = i < mValuesAtNanoPos.size() ? mValuesAtNanoPos[i] : 0.0f;
-                        if (show_srgb && !Channel::isAlpha(channels[i])) {
-                            value = toSRGB(value);
-                        }
-                        str = fmt::format("{:.8f}", value);
-                    }
+                    float value = i < mValuesAtNanoPos.size() ? mValuesAtNanoPos[i] : 0.0f;
+                    str = BitCastTypeToString(value, mImage->bitCastType(), show_srgb && !Channel::isAlpha(channels[i]), show_hex);
 
                     Color col = colors[i];
                     nvgFillColor(ctx, Color(col.r(), col.g(), col.b(), 1.0f));
@@ -619,13 +575,7 @@ void ImageCanvas::getValuesAtNanoPos(Vector2i nanoPos, vector<float>& result, co
         const Channel* c = mImage->channel(channel);
         TEV_ASSERT(c, "Requested channel must exist.");
 
-// [DDS.UINT] 
-#if 0
         result.push_back(c->eval(imageCoords));
-#else
-        result.push_back(mImage->decodePackedValue(c->eval(imageCoords)));
-#endif // [DDS.UINT] 
-
     }
 
     // Subtract reference if it exists.
@@ -642,13 +592,7 @@ void ImageCanvas::getValuesAtNanoPos(Vector2i nanoPos, vector<float>& result, co
                 c = mReference->channel(channels[i], Channel::looseMatch);
 #endif // [DDS]
 
-// [DDS.UINT] 
-#if 0
             float reference = c ? c->eval(referenceCoords) : defaultVal;
-#else
-            float reference = c ? mReference->decodePackedValue(c->eval(referenceCoords)) : defaultVal;
-#endif // [DDS.UINT] 
-
             result[i] = isAlpha ? 0.5f * (result[i] + reference) : applyMetric(result[i], reference);
         }
     }
@@ -1094,12 +1038,12 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
         minimum = min(minimum, cmin);
     }
 #else
-    if (image->isUInt())
+    if (image->bitCastType() == EBitCastType::UInt)
     {
         maximum = bit_cast<float>(numeric_limits<uint32_t>::min());
         minimum = bit_cast<float>(numeric_limits<uint32_t>::max());
     }
-    if (image->isSInt())
+    if (image->bitCastType() == EBitCastType::SInt)
     {
         maximum = bit_cast<float>(numeric_limits<int32_t>::min());
         minimum = bit_cast<float>(numeric_limits<int32_t>::max());
@@ -1107,14 +1051,14 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
 
     for (int i = 0; i < nChannels; ++i) {
         const auto& channel = flattened[i];
-        if (image->isUInt())
+        if (image->bitCastType() == EBitCastType::UInt)
         {
             auto [cmin, cmax, cmean] = channel.minMaxMean<uint32_t>();
             mean += cmean;
             maximum = bit_cast<float>(std::max(bit_cast<uint32_t>(maximum), cmax));
             minimum = bit_cast<float>(std::min(bit_cast<uint32_t>(minimum), cmin));
         }
-        else if (image->isSInt())
+        else if (image->bitCastType() == EBitCastType::SInt)
         {
             auto [cmin, cmax, cmean] = channel.minMaxMean<int32_t>();
             mean += cmean;
@@ -1136,19 +1080,9 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
     result->minimum = minimum;
 
 #if 1 // [DDS.UINT]
-    auto decodeHistogramValue = [&](float packedValue) -> double {
-        if (image->isUInt()) {
-            return static_cast<double>(image->decodePackedUInt(packedValue));
-        }
-        if (image->isSInt()) {
-            return static_cast<double>(image->decodePackedSInt(packedValue));
-        }
-        return static_cast<double>(packedValue);
-        };
-
     // Calculate histogram with float
-    minimum = decodeHistogramValue(minimum);
-    maximum = decodeHistogramValue(maximum);
+    minimum = BitCastTypeToFloat(minimum, image->bitCastType());
+    maximum = BitCastTypeToFloat(maximum, image->bitCastType());
 #endif // [DDS.UINT]
 
     // Now that we know the maximum and minimum value we can define our histogram bin size.
@@ -1192,7 +1126,7 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
         tasks.emplace_back(
             ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&, i](size_t j) {
 #if 1 // [DDS.UInt]
-                indices[j + i * numPixels] = valToBin(decodeHistogramValue(channel.eval(j)));
+                indices[j + i * numPixels] = valToBin(BitCastTypeToFloat(channel.eval(j), image->bitCastType()));
 #else
                 indices[j + i * numPixels] = valToBin(channel.eval(j));
 #endif // decodeHistogramValue

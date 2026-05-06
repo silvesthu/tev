@@ -306,11 +306,16 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
             throw invalid_argument{fmt::format("Unsupported DXGI format: {}", static_cast<int>(metadata.format))};
     }
 #else
-    resultData.isSInt = isDxgiSIntFormat(metadata.format);
-    resultData.isUInt = isDxgiUIntFormat(metadata.format);
+    resultData.bitCastType = EBitCastType::Float;
+    if (isDxgiUIntFormat(metadata.format)) {
+        resultData.bitCastType = EBitCastType::UInt;
+    } else if (isDxgiSIntFormat(metadata.format)) {
+        resultData.bitCastType = EBitCastType::SInt;
+    }
+
     format = getDxgiConversionTarget(metadata.format, numChannels);
     if (format == DXGI_FORMAT_UNKNOWN) {
-        throw invalid_argument{fmt::format("Unsupported DXGI format: {}", std::string(NAMEOF_ENUM(metadata.format)))};
+        throw invalid_argument{fmt::format("Unsupported DXGI format: {}", std::string(NAMEOF_ENUM(metadata.format)))}; 
     }
 #endif // [DDS.UINT]
 

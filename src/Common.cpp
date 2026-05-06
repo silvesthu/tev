@@ -255,4 +255,19 @@ EMetric toMetric(string name) {
     }
 }
 
+#if 1 // [DDS.UINT]
+std::string BitCastTypeToString(float raw, EBitCastType bit_cast_type, bool srgb, bool show_hex)
+{
+    if (bit_cast_type == EBitCastType::UInt) {
+        return fmt::format(fmt::runtime(show_hex ? "0x{:08X}" : "{}"), bit_cast<uint32_t>(raw));
+    }
+    else if (bit_cast_type == EBitCastType::SInt) {
+        return fmt::format(fmt::runtime(show_hex ? "0x{:08X}" : "{}"), bit_cast<int32_t>(raw));
+    }
+    else {
+        return fmt::format("{:.8f}", !srgb ? raw : toSRGB(raw));
+    }
+}
+#endif // [DDS.UINT]
+
 }

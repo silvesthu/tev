@@ -51,12 +51,27 @@ public:
     }
 
 #if 1 // [DDS]
+    bool getShowSRGB() const {
+        return mShowSRGB;
+    }
     void setShowSRGB(bool show_srgb) {
         mShowSRGB = show_srgb;
     }
 
+    bool getShowHex() const {
+        return mShowHex;
+    }
+
     void setShowHex(bool show_hex) {
         mShowHex = show_hex;
+    }
+
+    bool getBitCastType() const {
+        return mBitCastType;
+    }
+
+    void setBitCastType(EBitCastType bit_cast_type) {
+        mBitCastType = bit_cast_type;
     }
 #endif // [DDS]
 
@@ -206,6 +221,7 @@ private:
 #if 1 // [DDS]
     bool mShowSRGB = false;
     bool mShowHex = true;
+    EBitCastType mBitCastType = EBitCastType::Float;
     nanogui::Vector2i mNanoPos;
     std::vector<float> mValuesAtNanoPos;
 #endif // [DDS]
