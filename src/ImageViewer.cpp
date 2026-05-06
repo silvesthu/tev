@@ -23,6 +23,7 @@
 
 #if 1 // [DDS.UInt]
 #include <bit>
+#include <cstdint>
 #include <cmath>
 #include <limits>
 #endif // [DDS.UInt]
@@ -339,8 +340,8 @@ ImageViewer::ImageViewer(
                 mMinMaxFloatPanel->set_layout(new BoxLayout{ Orientation::Vertical, Alignment::Fill, 5, 2 });
                 auto floatValues = new Widget{ mMinMaxFloatPanel };
                 floatValues->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
-                auto minFloat = new FloatBox<float>(floatValues);
-                auto maxFloat = new FloatBox<float>(floatValues);
+                auto minFloat = new FloatBox<float>(floatValues, 0.0f);
+                auto maxFloat = new FloatBox<float>(floatValues, 1.0f);
                 minFloat->set_editable(true);
                 maxFloat->set_editable(true);
                 minFloat->set_callback([this](float value) {
@@ -377,8 +378,8 @@ ImageViewer::ImageViewer(
                 mMinMaxSIntPanel->set_layout(new BoxLayout{ Orientation::Vertical, Alignment::Fill, 5, 2 });
                 auto sintValues = new Widget{ mMinMaxSIntPanel };
                 sintValues->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
-                auto minSInt = new IntBox<int32_t>(sintValues);
-                auto maxSInt = new IntBox<int32_t>(sintValues);
+                auto minSInt = new IntBox<int32_t>(sintValues, INT_MIN);
+                auto maxSInt = new IntBox<int32_t>(sintValues, INT_MAX);
                 minSInt->set_editable(true);
                 maxSInt->set_editable(true);
                 minSInt->set_callback([this](int value) {
@@ -415,8 +416,8 @@ ImageViewer::ImageViewer(
                 mMinMaxUIntPanel->set_layout(new BoxLayout{ Orientation::Vertical, Alignment::Fill, 5, 2 });
                 auto uintValues = new Widget{ mMinMaxUIntPanel };
                 uintValues->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
-                auto minUInt = new IntBox<uint32_t>(uintValues);
-                auto maxUInt = new IntBox<uint32_t>(uintValues);
+                auto minUInt = new IntBox<uint32_t>(uintValues, 0);
+                auto maxUInt = new IntBox<uint32_t>(uintValues, UINT_MAX);
                 minUInt->set_editable(true);
                 maxUInt->set_editable(true);
                 minUInt->set_callback([this](int value) {
@@ -1282,6 +1283,37 @@ void ImageViewer::draw_contents() {
             mHistogram->setMean(statistics->mean);
             mHistogram->setMaximum(statistics->maximum);
             mHistogram->setZero(statistics->histogramZero);
+
+#if 1 // [DDS.UINT]
+            if (mCurrentImage && mCurrentImage->isUInt()) {
+                mHistogram->setValueType(MultiGraph::EValueType::UIntBitcast);
+            } else if (mCurrentImage && mCurrentImage->isSInt()) {
+                mHistogram->setValueType(MultiGraph::EValueType::SIntBitcast);
+            } else {
+                mHistogram->setValueType(MultiGraph::EValueType::Float);
+            }
+
+            std::string minStr = fmt::format("{:.3f}", statistics->minimum);
+            std::string meanStr = fmt::format("{:.3f}", statistics->mean);
+            std::string maxStr = fmt::format("{:.3f}", statistics->maximum);
+            if (mCurrentImage && mCurrentImage->isUInt()) {
+                minStr = fmt::format("{}", std::bit_cast<uint32_t>(statistics->minimum));
+                maxStr = fmt::format("{}", std::bit_cast<uint32_t>(statistics->maximum));
+            } else if (mCurrentImage && mCurrentImage->isSInt()) {
+                minStr = fmt::format("{}", std::bit_cast<int32_t>(statistics->minimum));
+                maxStr = fmt::format("{}", std::bit_cast<int32_t>(statistics->maximum));
+            }
+
+            mHistogram->set_tooltip(fmt::format(
+                "{}\n\n"
+                "Minimum: {}\n"
+                "Mean: {}\n"
+                "Maximum: {}",
+                histogramTooltipBase,
+                minStr,
+                meanStr,
+                maxStr)
+#else
             mHistogram->set_tooltip(fmt::format(
                 "{}\n\n"
                 "Minimum: {:.3f}\n"
@@ -1291,6 +1323,7 @@ void ImageViewer::draw_contents() {
                 statistics->minimum,
                 statistics->mean,
                 statistics->maximum)
+#endif // [DDS.UINT]
             );
         }
     } else {
@@ -1300,6 +1333,9 @@ void ImageViewer::draw_contents() {
         mHistogram->setMean(0);
         mHistogram->setMaximum(0);
         mHistogram->setZero(0);
+#if 1 // [DDS.UINT]
+        mHistogram->setValueType(MultiGraph::EValueType::Float);
+#endif // [DDS.UINT]
         mHistogram->set_tooltip(
             fmt::format("{}", histogramTooltipBase)
         );

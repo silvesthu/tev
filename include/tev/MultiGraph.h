@@ -13,6 +13,14 @@ namespace tev {
 
 class MultiGraph : public nanogui::Widget {
 public:
+#if 1 // [DDS][DDS.UINT]
+    enum class EValueType {
+        Float,
+        UIntBitcast,
+        SIntBitcast,
+    };
+#endif // [DDS][DDS.UINT]
+
     MultiGraph(nanogui::Widget *parent, const std::string &caption = "Untitled");
 
     const std::string &caption() const { return mCaption; }
@@ -58,6 +66,12 @@ public:
         mZeroBin = zeroBin;
     }
 
+#if 1 // [DDS][DDS.UINT]
+    void setValueType(EValueType valueType) {
+        mValueType = valueType;
+    }
+#endif // [DDS][DDS.UINT]
+
 protected:
     std::string mCaption, mHeader, mFooter;
     nanogui::Color mBackgroundColor, mForegroundColor, mTextColor;
@@ -65,6 +79,10 @@ protected:
     int mNChannels = 1;
     float mMinimum = 0, mMean = 0, mMaximum = 0;
     int mZeroBin = 0;
+
+#if 1 // [DDS][DDS.UINT]
+    EValueType mValueType = EValueType::Float;
+#endif // [DDS][DDS.UINT]
 };
 
 }
