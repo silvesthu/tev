@@ -503,9 +503,7 @@ void ImageCanvas::draw(NVGcontext* ctx) {
 
 #if 1 // [DDS]
         // If a hotkey is held, draw it!
-        if (
-            glfwGetKey(screen()->glfw_window(), GLFW_KEY_T)
-        ) {
+        if (glfwGetKey(screen()->glfw_window(), GLFW_KEY_T)) {
             nvgSave(ctx);
 
             nvgFontFace(ctx, "sans");
@@ -531,8 +529,39 @@ void ImageCanvas::draw(NVGcontext* ctx) {
                     drawTextWithShadow(ctx, pos.x(), pos.y() + 0 * 20.0f, str, 1.0f);
                 }
 
+                bool show_srgb = mShowSRGB && mImage->sRGB();
+                bool show_hex = mShowHex && (mImage->isUInt() || mImage->isSInt());
+
                 for (size_t i = 0; i < colors.size(); ++i) {
-                    string str = fmt::format("{:.8f}", mValuesAtNanoPos[i]);
+                    string str;
+
+                    auto imageCoords = getImageCoords(*mImage, mNanoPos);
+                    const Channel* c = mImage->channel(channels[i]);
+                    if (!c) {
+                        c = mImage->channel(channels[i], Channel::looseMatch);
+                    }
+
+                    float packedValue = c ? c->eval(imageCoords) : 0.0f;
+                    if (mImage->isUInt()) {
+                        if (show_hex) {
+                            str = fmt::format("0x{:08X}", mImage->decodePackedUInt(packedValue));
+                        } else {
+                            str = fmt::format("{}", mImage->decodePackedUInt(packedValue));
+                        }
+                    } else if (mImage->isSInt()) {
+                        if (show_hex) {
+                            str = fmt::format("0x{:08X}", static_cast<uint32_t>(mImage->decodePackedSInt(packedValue)));
+                        } else {
+                            str = fmt::format("{}", mImage->decodePackedSInt(packedValue));
+                        }
+                    } else {
+                        float value = i < mValuesAtNanoPos.size() ? mValuesAtNanoPos[i] : 0.0f;
+                        if (show_srgb && !Channel::isAlpha(channels[i])) {
+                            value = toSRGB(value);
+                        }
+                        str = fmt::format("{:.8f}", value);
+                    }
+
                     Color col = colors[i];
                     nvgFillColor(ctx, Color(col.r(), col.g(), col.b(), 1.0f));
                     drawTextWithShadow(ctx, pos.x(), pos.y() + (i + 1) * 20.0f, str, 1.0f);
