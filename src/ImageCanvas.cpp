@@ -913,10 +913,6 @@ shared_ptr<Lazy<shared_ptr<CanvasStatistics>>> ImageCanvas::canvasStatistics() {
     auto requestedChannelGroup = mRequestedChannelGroup;
     auto metric = mMetric;
 
-#if 1 // [DDS]
-    auto show_srgb = mShowSRGB;
-#endif // [DDS]
-
     promise<shared_ptr<CanvasStatistics>> promise;
     mCanvasStatistics.insert(make_pair(key, make_shared<Lazy<shared_ptr<CanvasStatistics>>>(promise.get_future())));
 
@@ -931,9 +927,19 @@ shared_ptr<Lazy<shared_ptr<CanvasStatistics>>> ImageCanvas::canvasStatistics() {
         mReference->setStaleIdCallback([this](int id) { purgeCanvasStatistics(id); });
     }
 
-    invokeTaskDetached([image, reference, requestedChannelGroup, metric, priority, show_srgb /* [DDS] */, p=std::move(promise)]() mutable -> Task<void> {
+    invokeTaskDetached([image, reference, requestedChannelGroup, metric, priority, p=std::move(promise)
+#if 1 // [DDS]
+        , show_srgb = mShowSRGB
+        , channel = mChannel
+#endif // [DDS]
+    ]() mutable -> Task<void> {
         co_await ThreadPool::global().enqueueCoroutine(priority);
-        p.set_value(co_await computeCanvasStatistics(image, reference, requestedChannelGroup, metric, priority, show_srgb /* [DDS] */));
+        p.set_value(co_await computeCanvasStatistics(image, reference, requestedChannelGroup, metric, priority
+#if 1 // [DDS]
+        , show_srgb
+        , channel
+#endif // [DDS]
+));
     });
 
     return mCanvasStatistics.at(key);
@@ -952,23 +958,18 @@ vector<Channel> ImageCanvas::channelsFromImages(
     shared_ptr<Image> reference,
     const string& requestedChannelGroup,
     EMetric metric,
-    int priority, bool show_srgb /* [DDS] */
+    int priority
+#if 1 // [DDS]
+    , bool show_srgb
+#endif // [DDS]
 ) {
     if (!image) {
         return {};
     }
 
 #if 1 // [DDS]
-    auto DDS_post_eval = [&](float e, const Image* i)  {
-
-// [DDS.UINT] 
-#if 0
+    auto post_eval = [&](float e, const Image* i)  {
         return show_srgb && i->sRGB() ? toSRGB(e) : e;
-#else
-        float decoded = i->decodePackedValue(e);
-        return show_srgb && i->sRGB() ? toSRGB(decoded) : decoded;
-#endif // [DDS.UINT] 
-
     };
 #endif // [DDS]
 
@@ -982,7 +983,7 @@ vector<Channel> ImageCanvas::channelsFromImages(
         ThreadPool::global().parallelFor(0, (int)channelNames.size(), [&](int i) {
             const auto* channel = image->channel(channelNames[i]);
             for (size_t j = 0; j < channel->numPixels(); ++j) {
-                result[i].at(j) = DDS_post_eval(channel->eval(j), image.get() /* [DDS] */);
+                result[i].at(j) = post_eval(channel->eval(j), image.get());
             }
         }, priority);
     } else {
@@ -1003,8 +1004,8 @@ vector<Channel> ImageCanvas::channelsFromImages(
                 for (int y = 0; y < size.y(); ++y) {
                     for (int x = 0; x < size.x(); ++x) {
                         result[i].at({x, y}) = 0.5f * (
-                            DDS_post_eval(channel->eval({x, y}), image.get() /* [DDS] */) +
-                            (referenceChannel ? DDS_post_eval(referenceChannel->eval({x + offset.x(), y + offset.y()}), reference.get() /* [DDS] */) : 1.0f)
+                            post_eval(channel->eval({x, y}), image.get()) +
+                            (referenceChannel ? post_eval(referenceChannel->eval({x + offset.x(), y + offset.y()}), reference.get()) : 1.0f)
                         );
                     }
                 }
@@ -1012,8 +1013,8 @@ vector<Channel> ImageCanvas::channelsFromImages(
                 for (int y = 0; y < size.y(); ++y) {
                     for (int x = 0; x < size.x(); ++x) {
                         result[i].at({x, y}) = ImageCanvas::applyMetric(
-                            DDS_post_eval(channel->eval({x, y}), image.get() /* [DDS] */),
-                            referenceChannel ? DDS_post_eval(referenceChannel->eval({x + offset.x(), y + offset.y()}), reference.get() /* [DDS] */) : 0.0f,
+                            post_eval(channel->eval({x, y}), image.get()),
+                            referenceChannel ? post_eval(referenceChannel->eval({x + offset.x(), y + offset.y()}), reference.get()) : 0.0f,
                             metric
                         );
                     }
@@ -1030,14 +1031,40 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
     std::shared_ptr<Image> reference,
     const string& requestedChannelGroup,
     EMetric metric,
-    int priority, bool show_srgb /* [DDS] */
+    int priority
+#if 1 // [DDS]
+    , bool show_srgb
+    , EChannel channel_mask
+#endif // [DDS]
 ) {
-    auto flattened = channelsFromImages(image, reference, requestedChannelGroup, metric, priority, show_srgb /* [DDS] */);
+    auto flattened = channelsFromImages(image, reference, requestedChannelGroup, metric, priority
+#if 1 // [DDS]
+        , show_srgb
+#endif // [DDS]
+    );
 
     float mean = 0;
     float maximum = -numeric_limits<float>::infinity();
     float minimum = numeric_limits<float>::infinity();
 
+#if 1 // [DDS]
+    for (auto it = flattened.begin(); it != flattened.end(); ) {
+        bool r = it->name().starts_with('R') && (channel_mask & EChannel::ChannelR);
+        bool g = it->name().starts_with('G') && (channel_mask & EChannel::ChannelG);
+        bool b = it->name().starts_with('B') && (channel_mask & EChannel::ChannelB);
+        bool a = it->name().starts_with('A') && (channel_mask & EChannel::ChannelA);
+        if (r || g || b || a) {
+            ++it;
+        }
+        else {
+            it = flattened.erase(it);
+        }
+    }
+
+    auto result = make_shared<CanvasStatistics>();
+
+    int nChannels = (int)flattened.size();
+#else
     const Channel* alphaChannel = nullptr;
     // Only treat the alpha channel specially if it is not the only channel of the image.
     if (!all_of(begin(flattened), end(flattened), [](const Channel& c) { return c.name() == "A"; })) {
@@ -1056,6 +1083,7 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
     auto result = make_shared<CanvasStatistics>();
 
     int nChannels = result->nChannels = alphaChannel ? (int)flattened.size() - 1 : (int)flattened.size();
+#endif // [DDS]
 
 #if 0 // [DDS.UINT]
     for (int i = 0; i < nChannels; ++i) {
@@ -1066,8 +1094,16 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
         minimum = min(minimum, cmin);
     }
 #else
-    result->isUInt = image && image->isUInt();
-    result->isInt = image && image->isSInt();
+    if (image->isUInt())
+    {
+        maximum = bit_cast<float>(numeric_limits<uint32_t>::min());
+        minimum = bit_cast<float>(numeric_limits<uint32_t>::max());
+    }
+    if (image->isSInt())
+    {
+        maximum = bit_cast<float>(numeric_limits<int32_t>::min());
+        minimum = bit_cast<float>(numeric_limits<int32_t>::max());
+    }
 
     for (int i = 0; i < nChannels; ++i) {
         const auto& channel = flattened[i];

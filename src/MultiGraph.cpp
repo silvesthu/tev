@@ -52,7 +52,11 @@ void MultiGraph::draw(NVGcontext *ctx) {
         // Additive blending
         nvgGlobalCompositeBlendFunc(ctx, NVGblendFactor::NVG_SRC_ALPHA, NVGblendFactor::NVG_ONE);
 
+#if 1 // [DDS]
+        size_t nBins = mNChannels == 0 ? 0 : mValues.size() / mNChannels;
+#else
         size_t nBins = mValues.size() / mNChannels;
+#endif // [DDS]
 
         for (size_t i = 0; i < (size_t)mNChannels; i++) {
             nvgBeginPath(ctx);

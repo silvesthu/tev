@@ -231,9 +231,13 @@ private:
     MultiGraph* mHistogram;
     std::set<std::shared_ptr<Image>> mToBump;
 
-    nanogui::Widget* mChannelButtonContainer;
-
 #if 1 // [DDS][DDS.UINT]
+    nanogui::Widget* mMinMaxFloatPanel = nullptr;
+    nanogui::Widget* mMinMaxSIntPanel = nullptr;
+    nanogui::Widget* mMinMaxUIntPanel = nullptr;
+
+    nanogui::Widget* mChannelButtonContainer = nullptr;
+
     nanogui::Button* mSrgbButton = nullptr;
     nanogui::Button* mHexButton = nullptr;
 #endif // // [DDS][DDS.UINT]

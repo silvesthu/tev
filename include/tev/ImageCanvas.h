@@ -20,11 +20,6 @@ struct CanvasStatistics {
     std::vector<float> histogram;
     int nChannels;
     int histogramZero;
-
-#if 1 // [DDS.UINT]
-    bool isUInt;
-    bool isInt;
-#endif // [DDS.UINT]
 };
 
 class ImageCanvas : public nanogui::Canvas {
@@ -168,7 +163,10 @@ private:
         std::shared_ptr<Image> reference,
         const std::string& requestedChannelGroup,
         EMetric metric,
-        int priority, bool show_srgb /* [DDS] */
+        int priority
+#if 1 // [DDS]
+        , bool show_srgb
+#endif // [DDS]
     );
 
     static Task<std::shared_ptr<CanvasStatistics>> computeCanvasStatistics(
@@ -176,7 +174,11 @@ private:
         std::shared_ptr<Image> reference,
         const std::string& requestedChannelGroup,
         EMetric metric,
-        int priority, bool show_srgb /* [DDS] */
+        int priority
+#if 1 // [DDS]
+        , bool show_srgb
+        , EChannel channel_mask
+#endif // [DDS]
     );
 
     void drawPixelValuesAsText(NVGcontext *ctx);

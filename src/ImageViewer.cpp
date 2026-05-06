@@ -21,6 +21,12 @@
 #include <iostream>
 #include <stdexcept>
 
+#if 1 // [DDS.UInt]
+#include <bit>
+#include <cmath>
+#include <limits>
+#endif // [DDS.UInt]
+
 using namespace nanogui;
 using namespace std;
 
@@ -324,52 +330,124 @@ ImageViewer::ImageViewer(
             mHistogram = new MultiGraph{panel, ""};
         }
 
-#if 0 // [DDS]
-#else
+#if 1 // [DDS]
         // Min, Max
         {
-            auto panel = new Widget{ mSidebarLayout };
-            panel->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+            {
+                mMinMaxFloatPanel = new Widget{ mSidebarLayout };
+                mMinMaxFloatPanel->set_visible(true);
+                mMinMaxFloatPanel->set_layout(new BoxLayout{ Orientation::Vertical, Alignment::Fill, 5, 2 });
+                auto floatValues = new Widget{ mMinMaxFloatPanel };
+                floatValues->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+                auto minFloat = new FloatBox<float>(floatValues);
+                auto maxFloat = new FloatBox<float>(floatValues);
+                minFloat->set_editable(true);
+                maxFloat->set_editable(true);
+                minFloat->set_callback([this](float value) {
+                    mImageCanvas->setMinMax({ value, mImageCanvas->MinMax().y() });
+                    });
+                maxFloat->set_callback([this](float value) {
+                    mImageCanvas->setMinMax({ mImageCanvas->MinMax().x(), value });
+                    });
+                auto floatButtons = new Widget{ mMinMaxFloatPanel };
+                floatButtons->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+                auto fitFloat = [=] {
+                    auto stat = mImageCanvas->canvasStatistics();
+                    if (stat == nullptr || !stat->isReady()) return;
+                    minFloat->set_value(stat->get()->minimum);
+                    maxFloat->set_value(stat->get()->maximum);
+                    mImageCanvas->setMinMax({ minFloat->value(), maxFloat->value() });
+                    };
+                auto resetFloat = [=] {
+                    minFloat->set_value(0.0f);
+                    maxFloat->set_value(1.0f);
+                    mImageCanvas->setMinMax({ minFloat->value(), maxFloat->value() });
+                    };
+                auto button = new Button{ floatButtons, "Fit Range" };
+                button->set_font_size(15);
+                button->set_callback(fitFloat);
+                button = new Button{ floatButtons, "Reset [0,1]" };
+                button->set_font_size(15);
+                button->set_callback(resetFloat);
+            }
 
-            auto min_float_box = new FloatBox<float>(panel);
-            min_float_box->set_editable(true);
-            min_float_box->set_callback([this](float value) {
-                mImageCanvas->setMinMax({ value, mImageCanvas->MinMax().y() });
+            {
+                mMinMaxSIntPanel = new Widget{ mSidebarLayout };
+                mMinMaxSIntPanel->set_visible(false);
+                mMinMaxSIntPanel->set_layout(new BoxLayout{ Orientation::Vertical, Alignment::Fill, 5, 2 });
+                auto sintValues = new Widget{ mMinMaxSIntPanel };
+                sintValues->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+                auto minSInt = new IntBox<int32_t>(sintValues);
+                auto maxSInt = new IntBox<int32_t>(sintValues);
+                minSInt->set_editable(true);
+                maxSInt->set_editable(true);
+                minSInt->set_callback([this](int value) {
+                    mImageCanvas->setMinMax({ (float)value, mImageCanvas->MinMax().y() });
                 });
-
-            auto max_float_box = new FloatBox<float>(panel);
-            max_float_box->set_editable(true);
-            max_float_box->set_callback([this](float value) {
-                mImageCanvas->setMinMax({ mImageCanvas->MinMax().x(), value });
+                maxSInt->set_callback([this](int value) {
+                    mImageCanvas->setMinMax({ mImageCanvas->MinMax().x(), (float)value });
                 });
+                auto sintButtons = new Widget{ mMinMaxSIntPanel };
+                sintButtons->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+                auto fitSInt = [=] {
+                    auto stat = mImageCanvas->canvasStatistics();
+                    if (stat == nullptr || !stat->isReady()) return;
+                    minSInt->set_value(std::bit_cast<int32_t>(stat->get()->minimum));
+                    maxSInt->set_value(std::bit_cast<int32_t>(stat->get()->maximum));
+                    mImageCanvas->setMinMax({ stat->get()->minimum, stat->get()->maximum });
+                };
+                auto resetSInt = [=] {
+                    minSInt->set_value(INT_MIN);
+                    maxSInt->set_value(INT_MAX);
+                    mImageCanvas->setMinMax({ std::bit_cast<float>(minSInt->value()), std::bit_cast<float>(maxSInt->value()) });
+                };
+                auto button = new Button{ sintButtons, "Fit Range" };
+                button->set_font_size(15);
+                button->set_callback(fitSInt);
+                button = new Button{ sintButtons, "Int Range" };
+                button->set_font_size(15);
+                button->set_callback(resetSInt);
+            }
 
-            auto fit = [=] {
-                auto stat = mImageCanvas->canvasStatistics();
-                if (stat == nullptr || !stat->isReady())
-                    return;
-
-                min_float_box->set_value(stat->get()->minimum);
-                max_float_box->set_value(stat->get()->maximum);
-                mImageCanvas->setMinMax({ min_float_box->value(), max_float_box->value() });
-            };
-
-            auto reset = [=] {
-                min_float_box->set_value(0);
-                max_float_box->set_value(1);
-                mImageCanvas->setMinMax({ min_float_box->value(), max_float_box->value() });
-            };
-            reset();
-
-            panel = new Widget{ mSidebarLayout };
-            panel->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
-
-            auto button = new Button{ panel, "Fit Range" };
-            button->set_font_size(15);
-            button->set_callback(fit);
-
-            button = new Button{ panel, "Reset [0,1]" };
-            button->set_font_size(15);
-            button->set_callback(reset);
+            {
+                mMinMaxUIntPanel = new Widget{ mSidebarLayout };
+                mMinMaxUIntPanel->set_visible(false);
+                mMinMaxUIntPanel->set_layout(new BoxLayout{ Orientation::Vertical, Alignment::Fill, 5, 2 });
+                auto uintValues = new Widget{ mMinMaxUIntPanel };
+                uintValues->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+                auto minUInt = new IntBox<uint32_t>(uintValues);
+                auto maxUInt = new IntBox<uint32_t>(uintValues);
+                minUInt->set_editable(true);
+                maxUInt->set_editable(true);
+                minUInt->set_callback([this](int value) {
+                    value = std::max(0, value);
+                    mImageCanvas->setMinMax({ (float)value, mImageCanvas->MinMax().y() });
+                });
+                maxUInt->set_callback([this](int value) {
+                    value = std::max(0, value);
+                    mImageCanvas->setMinMax({ mImageCanvas->MinMax().x(), (float)value });
+                });
+                auto uintButtons = new Widget{ mMinMaxUIntPanel };
+                uintButtons->set_layout(new GridLayout{ Orientation::Horizontal, 2, Alignment::Fill, 5, 2 });
+                auto fitUInt = [=] {
+                    auto stat = mImageCanvas->canvasStatistics();
+                    if (stat == nullptr || !stat->isReady()) return;
+                    minUInt->set_value(std::bit_cast<uint32_t>(stat->get()->minimum));
+                    maxUInt->set_value(std::bit_cast<uint32_t>(stat->get()->maximum));
+                    mImageCanvas->setMinMax({ stat->get()->minimum, stat->get()->maximum });
+                };
+                auto resetUInt = [=] {
+                    minUInt->set_value(0);
+                    maxUInt->set_value(UINT_MAX);
+                    mImageCanvas->setMinMax({ std::bit_cast<float>(minUInt->value()), std::bit_cast<float>(maxUInt->value()) });
+                };
+                auto button = new Button{ uintButtons, "Fit Range" };
+                button->set_font_size(15);
+                button->set_callback(fitUInt);
+                button = new Button{ uintButtons, "UInt Range" };
+                button->set_font_size(15);
+                button->set_callback(resetUInt);
+            }
         }
 
         // Channels
@@ -385,10 +463,10 @@ ImageViewer::ImageViewer(
                 return button;
             };
 
-            makeChannelButton("R", [this](bool) { setChannel(EChannel::ChannelR, false); });
-            makeChannelButton("G", [this](bool) { setChannel(EChannel::ChannelG, false); });
-            makeChannelButton("B", [this](bool) { setChannel(EChannel::ChannelB, false); });
-            makeChannelButton("A", [this](bool) { setChannel(EChannel::ChannelA, false); });
+            makeChannelButton("R", [this](bool) { setChannel(EChannel::ChannelR, false); if (mCurrentImage) { mCurrentImage->bumpId(); }});
+            makeChannelButton("G", [this](bool) { setChannel(EChannel::ChannelG, false); if (mCurrentImage) { mCurrentImage->bumpId(); }});
+            makeChannelButton("B", [this](bool) { setChannel(EChannel::ChannelB, false); if (mCurrentImage) { mCurrentImage->bumpId(); }});
+            makeChannelButton("A", [this](bool) { setChannel(EChannel::ChannelA, false); if (mCurrentImage) { mCurrentImage->bumpId(); }});
             mSrgbButton = new Button{ mChannelButtonContainer, "sRGB" };
             mSrgbButton->set_flags(Button::Flags::ToggleButton);
             mSrgbButton->set_font_size(15);
@@ -1528,6 +1606,12 @@ void ImageViewer::selectImage(const shared_ptr<Image>& image, bool stopPlayback)
             mGroupButtonContainer->remove_child_at(mGroupButtonContainer->child_count() - 1);
         }
 
+#if 1 // [DDS]
+        if (mMinMaxFloatPanel) mMinMaxFloatPanel->set_visible(true);
+        if (mMinMaxSIntPanel) mMinMaxSIntPanel->set_visible(false);
+        if (mMinMaxUIntPanel) mMinMaxUIntPanel->set_visible(false);
+#endif // [DDS]
+
         requestLayoutUpdate();
         return;
     }
@@ -1595,6 +1679,11 @@ void ImageViewer::selectImage(const shared_ptr<Image>& image, bool stopPlayback)
 
     mImageCanvas->setShowSRGB(srgbEnabled && mSrgbButton->pushed());
     mImageCanvas->setShowHex(hexEnabled && mHexButton->pushed());
+
+    if (mMinMaxFloatPanel) mMinMaxFloatPanel->set_visible(!image->isUInt() && !image->isSInt());
+    if (mMinMaxSIntPanel) mMinMaxSIntPanel->set_visible(image->isSInt());
+    if (mMinMaxUIntPanel) mMinMaxUIntPanel->set_visible(image->isUInt());
+    requestLayoutUpdate();
 #endif // [DDS][DDS.UINT]
 
     // Ensure the currently active image button is always fully on-screen

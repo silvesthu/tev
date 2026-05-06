@@ -112,7 +112,7 @@ public:
             min = std::min(min, v);
             max = std::max(max, v);
         }
-        return { static_cast<T>(min), static_cast<T>(max), mean / numPixels() };
+        return { min, max, mean / numPixels() };
     }
 #endif // [DDS][DDS.UINT]
 
