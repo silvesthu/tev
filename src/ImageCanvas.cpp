@@ -1061,9 +1061,9 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
         }
     }
 
-    auto result = make_shared<CanvasStatistics>();
-
     int nChannels = (int)flattened.size();
+    auto result = make_shared<CanvasStatistics>();
+    result->nChannels = nChannels;
 #else
     const Channel* alphaChannel = nullptr;
     // Only treat the alpha channel specially if it is not the only channel of the image.
