@@ -12,6 +12,7 @@
 #include <nanogui/theme.h>
 #include <nanogui/vector.h>
 
+#include <algorithm>
 #include <fstream>
 #include <numeric>
 #include <set>
@@ -1027,6 +1028,7 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
 
     int nChannels = result->nChannels = alphaChannel ? (int)flattened.size() - 1 : (int)flattened.size();
 
+#if 0 // [DDS.UINT]
     for (int i = 0; i < nChannels; ++i) {
         const auto& channel = flattened[i];
         auto [cmin, cmax, cmean] = channel.minMaxMean();
@@ -1034,6 +1036,35 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
         maximum = max(maximum, cmax);
         minimum = min(minimum, cmin);
     }
+#else
+    result->isUInt = image && image->isUInt();
+    result->isInt = image && image->isSInt();
+
+    for (int i = 0; i < nChannels; ++i) {
+        const auto& channel = flattened[i];
+        if (image->isUInt())
+        {
+            auto [cmin, cmax, cmean] = channel.minMaxMean<uint32_t>();
+            mean += cmean;
+            maximum = bit_cast<float>(std::max(bit_cast<uint32_t>(maximum), cmax));
+            minimum = bit_cast<float>(std::min(bit_cast<uint32_t>(minimum), cmin));
+        }
+        else if (image->isSInt())
+        {
+            auto [cmin, cmax, cmean] = channel.minMaxMean<int32_t>();
+            mean += cmean;
+            maximum = bit_cast<float>(std::max(bit_cast<int32_t>(maximum), cmax));
+            minimum = bit_cast<float>(std::min(bit_cast<int32_t>(minimum), cmin));
+        }
+        else
+        {
+            auto [cmin, cmax, cmean] = channel.minMaxMean();
+            mean += cmean;
+            maximum = std::max(maximum, cmax);
+            minimum = std::min(minimum, cmin);
+        }
+    }
+#endif // [DDS.UINT]
 
     result->mean = nChannels > 0 ? (mean / nChannels) : 0;
     result->maximum = maximum;

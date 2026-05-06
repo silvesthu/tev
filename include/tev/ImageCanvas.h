@@ -20,6 +20,11 @@ struct CanvasStatistics {
     std::vector<float> histogram;
     int nChannels;
     int histogramZero;
+
+#if 1 // [DDS.UINT]
+    bool isUInt;
+    bool isInt;
+#endif // [DDS.UINT]
 };
 
 class ImageCanvas : public nanogui::Canvas {

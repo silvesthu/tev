@@ -8,6 +8,11 @@
 
 #include <nanogui/vector.h>
 
+#if 1 // [DDS][DDS.UINT]
+#include <bit>
+#include <cstdint>
+#endif // [DDS][DDS.UINT]
+
 #include <future>
 #include <string>
 #include <vector>
@@ -93,6 +98,23 @@ public:
         }
         return {min, max, mean/numPixels()};
     }
+
+#if 1 // [DDS][DDS.UINT]
+    template <typename T>
+    std::tuple<T, T, double> minMaxMean() const
+    {
+        T min = std::numeric_limits<T>::max();
+        T max = std::numeric_limits<T>::min();
+        double mean = 0.0;
+        for (float f : mData) {
+            T v = std::bit_cast<T>(f);
+            mean += static_cast<double>(v);
+            min = std::min(min, v);
+            max = std::max(max, v);
+        }
+        return { static_cast<T>(min), static_cast<T>(max), mean / numPixels() };
+    }
+#endif // [DDS][DDS.UINT]
 
     Task<void> divideByAsync(const Channel& other, int priority);
 
