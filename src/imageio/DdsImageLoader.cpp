@@ -169,6 +169,104 @@ static int getDxgiChannelCount(DXGI_FORMAT fmt) {
     }
 }
 
+// [DDS.UINT]
+static bool isDxgiUIntFormat(DXGI_FORMAT fmt) {
+
+    switch (fmt) {
+        case DXGI_FORMAT_R32G32B32A32_UINT:
+        case DXGI_FORMAT_R16G16B16A16_UINT:
+        case DXGI_FORMAT_R10G10B10A2_UINT:
+        case DXGI_FORMAT_R8G8B8A8_UINT:
+        case DXGI_FORMAT_R32G32B32_UINT:
+        case DXGI_FORMAT_R32G32_UINT:
+        case DXGI_FORMAT_R16G16_UINT:
+        case DXGI_FORMAT_R8G8_UINT:
+        case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+        case DXGI_FORMAT_D24_UNORM_S8_UINT:
+        case DXGI_FORMAT_R32_UINT:
+        case DXGI_FORMAT_R16_UINT:
+        case DXGI_FORMAT_R8_UINT:
+        case DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
+        case DXGI_FORMAT_X24_TYPELESS_G8_UINT:
+            return true;
+        default:
+            return false;
+    }
+
+}
+
+// [DDS.UINT]
+static bool isDxgiSIntFormat(DXGI_FORMAT fmt) {
+
+    switch (fmt) {
+        case DXGI_FORMAT_R32G32B32A32_SINT:
+        case DXGI_FORMAT_R16G16B16A16_SINT:
+        case DXGI_FORMAT_R8G8B8A8_SINT:
+        case DXGI_FORMAT_R32G32B32_SINT:
+        case DXGI_FORMAT_R32G32_SINT:
+        case DXGI_FORMAT_R16G16_SINT:
+        case DXGI_FORMAT_R8G8_SINT:
+        case DXGI_FORMAT_R32_SINT:
+        case DXGI_FORMAT_R16_SINT:
+        case DXGI_FORMAT_R8_SINT:
+            return true;
+        default:
+            return false;
+    }
+
+}
+
+// [DDS.UINT]
+static bool isDxgiSrgbFormat(DXGI_FORMAT fmt) {
+
+    switch (fmt) {
+        case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+        case DXGI_FORMAT_BC1_UNORM_SRGB:
+        case DXGI_FORMAT_BC2_UNORM_SRGB:
+        case DXGI_FORMAT_BC3_UNORM_SRGB:
+        case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+        case DXGI_FORMAT_BC7_UNORM_SRGB:
+        case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
+            return true;
+        default:
+            return false;
+    }
+
+}
+
+// [DDS.UINT]
+static DXGI_FORMAT getDxgiConversionTarget(DXGI_FORMAT sourceFormat, int numChannels) {
+
+    if (isDxgiUIntFormat(sourceFormat)) {
+        switch (numChannels) {
+            case 4: return DXGI_FORMAT_R32G32B32A32_UINT;
+            case 3: return DXGI_FORMAT_R32G32B32_UINT;
+            case 2: return DXGI_FORMAT_R32G32_UINT;
+            case 1: return DXGI_FORMAT_R32_UINT;
+            default: return DXGI_FORMAT_UNKNOWN;
+        }
+    }
+
+    if (isDxgiSIntFormat(sourceFormat)) {
+        switch (numChannels) {
+            case 4: return DXGI_FORMAT_R32G32B32A32_SINT;
+            case 3: return DXGI_FORMAT_R32G32B32_SINT;
+            case 2: return DXGI_FORMAT_R32G32_SINT;
+            case 1: return DXGI_FORMAT_R32_SINT;
+            default: return DXGI_FORMAT_UNKNOWN;
+        }
+    }
+
+    switch (numChannels) {
+        case 4: return DXGI_FORMAT_R32G32B32A32_FLOAT;
+        case 3: return DXGI_FORMAT_R32G32B32_FLOAT;
+        case 2: return DXGI_FORMAT_R32G32_FLOAT;
+        case 1: return DXGI_FORMAT_R32_FLOAT;
+        default: return DXGI_FORMAT_UNKNOWN;
+    }
+
+}
+
 Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, const string& channelSelector, int priority) const {
     vector<ImageData> result(1);
     ImageData& resultData = result.front();
@@ -187,6 +285,8 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
 
     DXGI_FORMAT format;
     int numChannels = getDxgiChannelCount(metadata.format);
+
+#if 0 // [DDS.UINT]
     switch (numChannels) {
         case 4:
             format = DXGI_FORMAT_R32G32B32A32_FLOAT;
@@ -204,8 +304,16 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
         default:
             throw invalid_argument{fmt::format("Unsupported DXGI format: {}", static_cast<int>(metadata.format))};
     }
+#else
+    resultData.isSInt = isDxgiSIntFormat(metadata.format);
+    resultData.isUInt = isDxgiUIntFormat(metadata.format);
+    format = getDxgiConversionTarget(metadata.format, numChannels);
+    if (format == DXGI_FORMAT_UNKNOWN) {
+        throw invalid_argument{fmt::format("Unsupported DXGI format: {}", std::string(NAMEOF_ENUM(metadata.format)))};
+    }
+#endif // [DDS.UINT]
 
-#if 0 // [DDS]
+#if 0 // [DDS][DDS.UINT]
     // Use DirectXTex to either decompress or convert to the target floating point format.
     if (DirectX::IsCompressed(metadata.format)) {
         DirectX::ScratchImage decompImage;
@@ -248,21 +356,47 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
         {
             for (int slice = 0; slice < metadata.depth; ++slice)
             {
-                const uint8_t* pixels = scratchImage.GetImage(mipLevel, arrayIndex, slice)->pixels;
+                const DirectX::Image* sourceImage = scratchImage.GetImage(mipLevel, arrayIndex, slice);
+                if (!sourceImage) {
+                    throw invalid_argument{ "Failed to access DDS subresource." };
+                }
+
+                const uint8_t* pixels = sourceImage->pixels;
+                size_t width = sourceImage->width;
+                size_t height = sourceImage->height;
+                size_t rowPitch = sourceImage->rowPitch;
 
                 // Use DirectXTex to either decompress or convert to the target floating point format.
                 DirectX::ScratchImage convertedScratchImage;
                 if (DirectX::IsCompressed(metadata.format)) {
-                    if (DirectX::Decompress(*scratchImage.GetImage(mipLevel, arrayIndex, slice), format, convertedScratchImage) != S_OK) {
+                    if (DirectX::Decompress(*sourceImage, format, convertedScratchImage) != S_OK) {
                         throw invalid_argument{ "Failed to decompress DDS image." };
                     }
-                    pixels = convertedScratchImage.GetPixels();
+
+                    const DirectX::Image* convertedImage = convertedScratchImage.GetImage(0, 0, 0);
+                    if (!convertedImage) {
+                        throw invalid_argument{ "Failed to access decompressed DDS subresource." };
+                    }
+
+                    pixels = convertedImage->pixels;
+                    width = convertedImage->width;
+                    height = convertedImage->height;
+                    rowPitch = convertedImage->rowPitch;
                 }
                 else if (metadata.format != format) {
-                    if (DirectX::Convert(*scratchImage.GetImage(mipLevel, arrayIndex, slice), format, DirectX::TEX_FILTER_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT, convertedScratchImage) != S_OK) {
+                    if (DirectX::Convert(*sourceImage, format, DirectX::TEX_FILTER_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT, convertedScratchImage) != S_OK) {
                         throw invalid_argument{ "Failed to convert DDS image." };
                     }
-                    pixels = convertedScratchImage.GetPixels();
+
+                    const DirectX::Image* convertedImage = convertedScratchImage.GetImage(0, 0, 0);
+                    if (!convertedImage) {
+                        throw invalid_argument{ "Failed to access converted DDS subresource." };
+                    }
+
+                    pixels = convertedImage->pixels;
+                    width = convertedImage->width;
+                    height = convertedImage->height;
+                    rowPitch = convertedImage->rowPitch;
                 }
 
                 std::string cubeFaceNames[] = { "X+", "X-", "Y+", "Y-", "Z+", "Z-" };
@@ -274,29 +408,46 @@ Task<vector<ImageData>> DdsImageLoader::load(istream& iStream, const fs::path&, 
                 std::vector<Channel> channels = makeNChannels(numChannels, { (int)metadata.width, (int)metadata.height }, layerPrefix);
 
                 // Read the data as it is
-                auto typedData = reinterpret_cast<const float*>(pixels);
-                co_await ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&](size_t i) {
-                    size_t mipWidth = metadata.width >> mipLevel;
-                    size_t w = (i % metadata.width) >> mipLevel;
-                    size_t h = (i / metadata.width) >> mipLevel;
-                    size_t baseIdx = (w + h * mipWidth) * numChannels;
-                    for (int c = 0; c < numChannels; ++c) {
-                        channels[c].at(i) = typedData[baseIdx + c]; // Pitch?
+                size_t subresourceNumPixels = width * height;
+                co_await ThreadPool::global().parallelForAsync<size_t>(0, subresourceNumPixels, [&](size_t i) {
+                    size_t x = i % width;
+                    size_t y = i / width;
+                    const uint8_t* rowPtr = pixels + y * rowPitch;
+
+                    if (isDxgiUIntFormat(format)) {
+                        const uint32_t* typedRow = reinterpret_cast<const uint32_t*>(rowPtr);
+                        size_t baseIdx = x * numChannels;
+                        for (int c = 0; c < numChannels; ++c) {
+                            channels[c].at(i) = static_cast<float>(typedRow[baseIdx + c]);
+                        }
+                    } else if (isDxgiSIntFormat(format)) {
+                        const int32_t* typedRow = reinterpret_cast<const int32_t*>(rowPtr);
+                        size_t baseIdx = x * numChannels;
+                        for (int c = 0; c < numChannels; ++c) {
+                            channels[c].at(i) = static_cast<float>(typedRow[baseIdx + c]);
+                        }
+                    } else {
+                        const float* typedRow = reinterpret_cast<const float*>(rowPtr);
+                        size_t baseIdx = x * numChannels;
+                        for (int c = 0; c < numChannels; ++c) {
+                            channels[c].at(i) = typedRow[baseIdx + c];
+                        }
                     }
-                    }, priority);
+                }, priority);
 
                 for (const Channel& channel : channels)
                     resultData.channels.push_back(channel);
             }
         }
     }
-#endif // [DDS]
+#endif // [DDS][DDS.UINT]
 
     resultData.hasPremultipliedAlpha = scratchImage.GetMetadata().IsPMAlpha();
 
 #if 1 // [DDS]
+    // resultData.sRGB = isDxgiSrgbFormat(metadata.format) && !isDxgiUIntFormat(metadata.format) && !isDxgiSIntFormat(metadata.format);
+    // Treat all as non-SRGB for now
     resultData.sRGB = false;
-
     resultData.format = fmt::format(" {} - {} Depth - {} Array - {} Mips", std::string(NAMEOF_ENUM(metadata.format)), metadata.depth, metadata.arraySize, metadata.mipLevels);
 #endif // [DDS]
 

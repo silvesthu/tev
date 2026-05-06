@@ -35,6 +35,8 @@ struct ImageData {
     bool hasPremultipliedAlpha;
 
 #if 1 // [DDS]
+    bool isSInt = false;
+    bool isUInt = false;
     bool sRGB = true;
 #endif // [DDS]
 
