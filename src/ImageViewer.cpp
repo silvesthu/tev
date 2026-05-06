@@ -375,7 +375,7 @@ ImageViewer::ImageViewer(
         // Channels
         {
             mChannelButtonContainer = new Widget{ mSidebarLayout };
-            mChannelButtonContainer->set_layout(new GridLayout{ Orientation::Horizontal, 5, Alignment::Fill, 5, 2 });
+            mChannelButtonContainer->set_layout(new GridLayout{ Orientation::Horizontal, 6, Alignment::Fill, 5, 2 });
 
             auto makeChannelButton = [&](const string& name, function<void(bool)> callback) {
                 auto button = new Button{ mChannelButtonContainer, name };
@@ -389,32 +389,40 @@ ImageViewer::ImageViewer(
             makeChannelButton("G", [this](bool) { setChannel(EChannel::ChannelG, false); });
             makeChannelButton("B", [this](bool) { setChannel(EChannel::ChannelB, false); });
             makeChannelButton("A", [this](bool) { setChannel(EChannel::ChannelA, false); });
+            mSrgbButton = new Button{ mChannelButtonContainer, "sRGB" };
+            mSrgbButton->set_flags(Button::Flags::ToggleButton);
+            mSrgbButton->set_font_size(15);
+            mSrgbButton->set_pushed(true);
+            mSrgbButton->set_enabled(false);
+            mSrgbButton->set_tooltip(
+                "Show float values as sRGB.\n"
+                "Visualization is not affected by this button."
+            );
+            mSrgbButton->set_change_callback([this](bool state) {
+                mImageCanvas->setShowSRGB(state);
+                if (mCurrentImage) {
+                    mCurrentImage->bumpId();
+                }
+            });
+
+            mHexButton = new Button{ mChannelButtonContainer, "HEX" };
+            mHexButton->set_flags(Button::Flags::ToggleButton);
+            mHexButton->set_font_size(15);
+            mHexButton->set_pushed(true);
+            mHexButton->set_enabled(false);
+            mHexButton->set_tooltip(
+                "Show integer values in hexadecimal.\n"
+                "Visualization is not affected by this button."
+            );
+            mHexButton->set_change_callback([this](bool state) {
+                mImageCanvas->setShowHex(state);
+                if (mCurrentImage) {
+                    mCurrentImage->bumpId();
+                }
+            });
 
             setChannel(EChannel::ChannelRGB, true);
-
-            {
-                mAltButton = new Button{ mChannelButtonContainer, "sRGB" };
-                mAltButton->set_flags(Button::Flags::ToggleButton);
-                mAltButton->set_font_size(15);
-                mAltButton->set_change_callback([this](bool state) {
-                    if (!mCurrentImage) {
-                        return;
-                    }
-
-                    bool isIntegerImage = mCurrentImage->isUInt() || mCurrentImage->isSInt();
-                    mImageCanvas->setShowHex(isIntegerImage && state);
-                    mImageCanvas->setShowSRGB(!isIntegerImage && state);
-                    mCurrentImage->bumpId();
-                });
-                mAltButton->set_pushed(true);
-                mAltButton->set_enabled(false);
-                mAltButton->set_tooltip(
-                    "Alt Mode to visualize image\n"
-                    "- sRGB: Show float values as sRGB\n"
-                    "- HEX: Show int values as HEX\n"
-                );
-            };
-        }
+        };
 #endif // [DDS]
 
         // Fuzzy filter of open images
@@ -1571,12 +1579,22 @@ void ImageViewer::selectImage(const shared_ptr<Image>& image, bool stopPlayback)
 
 #if 1 // [DDS][DDS.UINT]
     bool isIntegerImage = image->isUInt() || image->isSInt();
-    mAltButton->set_enabled(image->sRGB() || isIntegerImage);
-    mAltButton->set_caption(isIntegerImage ? "HEX" : "sRGB");
+    bool srgbEnabled = image->sRGB() && !isIntegerImage;
+    bool hexEnabled = isIntegerImage;
 
-    bool toggleState = mAltButton->pushed();
-    mImageCanvas->setShowHex(isIntegerImage && toggleState);
-    mImageCanvas->setShowSRGB(!isIntegerImage && toggleState);
+    mSrgbButton->set_enabled(srgbEnabled);
+    mHexButton->set_enabled(hexEnabled);
+
+    if (!srgbEnabled) {
+        mSrgbButton->set_pushed(false);
+    }
+
+    if (!hexEnabled) {
+        mHexButton->set_pushed(false);
+    }
+
+    mImageCanvas->setShowSRGB(srgbEnabled && mSrgbButton->pushed());
+    mImageCanvas->setShowHex(hexEnabled && mHexButton->pushed());
 #endif // [DDS][DDS.UINT]
 
     // Ensure the currently active image button is always fully on-screen
@@ -1772,6 +1790,12 @@ void ImageViewer::setChannel(EChannel channel, bool reset) {
     EChannel new_channel = ChannelNone;
     auto& buttons = mChannelButtonContainer->children();
     for (size_t i = 0; i < buttons.size(); ++i) {
+#if 1 // [DDS][DDS.UINT]
+        if (i >= 4) {
+            continue;
+        }
+#endif // [DDS][DDS.UINT]
+
         Button* b = dynamic_cast<Button*>(buttons[i]);
 
         bool active_bit = ((1 << i) & channel) != 0;
@@ -2181,20 +2205,20 @@ void ImageViewer::updateTitle() {
 
             float packedValue = c ? c->eval(imageCoords) : 0.0f;
             if (mCurrentImage->isUInt()) {
-                if (mAltButton->pushed()) {
+                if (mHexButton->pushed()) {
                     valuesString += fmt::format("0x{:08X},", mCurrentImage->decodePackedUInt(packedValue));
                 } else {
                     valuesString += fmt::format("{},", mCurrentImage->decodePackedUInt(packedValue));
                 }
             } else if (mCurrentImage->isSInt()) {
-                if (mAltButton->pushed()) {
+                if (mHexButton->pushed()) {
                     valuesString += fmt::format("0x{:08X},", static_cast<uint32_t>(mCurrentImage->decodePackedSInt(packedValue)));
                 } else {
                     valuesString += fmt::format("{},", mCurrentImage->decodePackedSInt(packedValue));
                 }
             } else {
                 float value = values[i];
-                if (mAltButton->pushed() && mCurrentImage->sRGB()) {
+                if (mSrgbButton->pushed() && mCurrentImage->sRGB()) {
                     value = toSRGB(value);
                 }
                 valuesString += fmt::format("{:.8f},", value);

@@ -292,7 +292,7 @@ Texture* Image::texture(const vector<string>& channelNames) {
                 );
             } else {
                 const auto& channelData = chan->data();
-#if 0 // [DDS]
+#if 0 // [DDS][DDS.UINT] 
                 tasks.emplace_back(
                     ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&channelData, &data, i](size_t j) {
                         data[j * 4 + i] = channelData[j];
@@ -302,18 +302,11 @@ Texture* Image::texture(const vector<string>& channelNames) {
                 bool sRGB = mData.sRGB;
                 tasks.emplace_back(
                     ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&channelData, &data, i, sRGB, this](size_t j) {
-
-// [DDS.UINT] 
-#if 0
-                        data[j * 4 + i] = sRGB ? toSRGB(channelData[j]) : channelData[j];
-#else
                         float value = mData.decodePackedValue(channelData[j]);
                         data[j * 4 + i] = sRGB ? toSRGB(value) : value;
-#endif // [DDS.UINT] 
-
                     }, std::numeric_limits<int>::max())
                 );
-#endif // [DDS]
+#endif // [DDS][DDS.UINT]
             }
         } else {
             tasks.emplace_back(
