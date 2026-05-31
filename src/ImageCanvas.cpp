@@ -13,6 +13,7 @@
 #include <nanogui/vector.h>
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <numeric>
 #include <set>
@@ -21,6 +22,30 @@ using namespace nanogui;
 using namespace std;
 
 namespace tev {
+
+static bool shouldKeepHistogramChannel(const Channel& channel, EChannel channelMask) {
+    bool r = channel.name().starts_with('R') && (channelMask & EChannel::ChannelR);
+    bool g = channel.name().starts_with('G') && (channelMask & EChannel::ChannelG);
+    bool b = channel.name().starts_with('B') && (channelMask & EChannel::ChannelB);
+    bool a = channel.name().starts_with('A') && (channelMask & EChannel::ChannelA);
+    bool maskable =
+        channel.name().starts_with('R') ||
+        channel.name().starts_with('G') ||
+        channel.name().starts_with('B') ||
+        channel.name().starts_with('A');
+
+    return !maskable || r || g || b || a;
+}
+
+static void applyHistogramChannelMask(vector<Channel>& channels, EChannel channelMask) {
+    for (auto it = channels.begin(); it != channels.end(); ) {
+        if (shouldKeepHistogramChannel(*it, channelMask)) {
+            ++it;
+        } else {
+            it = channels.erase(it);
+        }
+    }
+}
 
 ImageCanvas::ImageCanvas(Widget* parent, float pixelRatio)
 : Canvas{parent, 1, false, false, false}, mPixelRatio{pixelRatio} {
@@ -1016,27 +1041,44 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
     float minimum = numeric_limits<float>::infinity();
 
 #if 1 // [DDS]
-    for (auto it = flattened.begin(); it != flattened.end(); ) {
-        bool r = it->name().starts_with('R') && (channel_mask & EChannel::ChannelR);
-        bool g = it->name().starts_with('G') && (channel_mask & EChannel::ChannelG);
-        bool b = it->name().starts_with('B') && (channel_mask & EChannel::ChannelB);
-        bool a = it->name().starts_with('A') && (channel_mask & EChannel::ChannelA);
-        bool maskable =
-            it->name().starts_with('R') ||
-            it->name().starts_with('G') ||
-            it->name().starts_with('B') ||
-            it->name().starts_with('A');
-        if (!maskable || r || g || b || a) {
-            ++it;
-        }
-        else {
-            it = flattened.erase(it);
-        }
-    }
+    applyHistogramChannelMask(flattened, channel_mask);
 
     int nChannels = (int)flattened.size();
     auto result = make_shared<CanvasStatistics>();
     result->nChannels = nChannels;
+
+    if (reference && nChannels > 0) {
+        auto squaredErrorChannels = metric == EMetric::SquaredError ? flattened : channelsFromImages(
+            image,
+            reference,
+            requestedChannelGroup,
+            EMetric::SquaredError,
+            priority
+#if 1 // [DDS]
+            , show_srgb
+#endif // [DDS]
+        );
+
+        if (metric != EMetric::SquaredError) {
+            applyHistogramChannelMask(squaredErrorChannels, channel_mask);
+        }
+
+        float meanSquaredError = 0.0f;
+        int nErrorChannels = (int)squaredErrorChannels.size();
+        for (int i = 0; i < nErrorChannels; ++i) {
+            const auto& channel = squaredErrorChannels[i];
+            auto [cmin, cmax, cmean] = channel.minMaxMean();
+            meanSquaredError += cmean;
+        }
+
+        result->hasErrorMetrics = nErrorChannels > 0;
+        if (result->hasErrorMetrics) {
+            result->meanSquaredError = meanSquaredError / nErrorChannels;
+            result->peakSignalToNoiseRatio = result->meanSquaredError > 0.0f ?
+                10.0f * log10(1.0f / result->meanSquaredError) :
+                numeric_limits<float>::infinity();
+        }
+    }
 #else
     const Channel* alphaChannel = nullptr;
     // Only treat the alpha channel specially if it is not the only channel of the image.

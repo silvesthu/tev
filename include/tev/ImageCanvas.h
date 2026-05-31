@@ -17,9 +17,12 @@ struct CanvasStatistics {
     float mean;
     float maximum;
     float minimum;
+    float meanSquaredError = 0.0f;
+    float peakSignalToNoiseRatio = 0.0f;
     std::vector<float> histogram;
     int nChannels;
     int histogramZero;
+    bool hasErrorMetrics = false;
 };
 
 class ImageCanvas : public nanogui::Canvas {

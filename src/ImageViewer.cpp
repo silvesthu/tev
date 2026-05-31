@@ -1310,11 +1310,16 @@ void ImageViewer::draw_contents() {
                 "{}\n\n"
                 "Minimum: {}\n"
                 "Mean: {}\n"
-                "Maximum: {}",
+                "Maximum: {}{}",
                 histogramTooltipBase,
                 minStr,
                 meanStr,
-                maxStr)
+                maxStr,
+                statistics->hasErrorMetrics ? fmt::format(
+                    "\nMSE: {:.6g}\nPSNR: {:.3f} dB",
+                    statistics->meanSquaredError,
+                    statistics->peakSignalToNoiseRatio
+                ) : string{})
 #else
             mHistogram->set_tooltip(fmt::format(
                 "{}\n\n"
