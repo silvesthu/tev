@@ -11,6 +11,7 @@
 #include <atomic>
 #include <cctype>
 #include <map>
+#include <mutex>
 #include <regex>
 
 #ifdef _WIN32
@@ -25,6 +26,46 @@ using namespace nanogui;
 using namespace std;
 
 namespace tev {
+
+namespace {
+    class LogBufferOutput : public tlog::IOutput {
+    public:
+        void writeLine(const string& scope, tlog::ESeverity severity, const string& line) override {
+            string text;
+            if (severity != tlog::ESeverity::None) {
+                text += tlog::nowToString("%H:%M:%S ");
+                text += tlog::severityToString(severity) + " ";
+            }
+
+            if (!scope.empty()) {
+                text += "[" + scope + "] ";
+            }
+
+            text += line;
+
+            lock_guard<mutex> lock{mMutex};
+            mLines.emplace_back(move(text));
+        }
+
+        void writeProgress(const string& scope, uint64_t current, uint64_t total, tlog::duration_t duration) override {
+            writeLine(scope, tlog::ESeverity::Progress, tlog::progressBar(current, total, duration, 80));
+        }
+
+        vector<string> lines() const {
+            lock_guard<mutex> lock{mMutex};
+            return {begin(mLines), end(mLines)};
+        }
+
+    private:
+        mutable mutex mMutex;
+        vector<string> mLines;
+    };
+
+    shared_ptr<LogBufferOutput>& logBufferOutput() {
+        static auto output = make_shared<LogBufferOutput>();
+        return output;
+    }
+}
 
 u8string toU8string(const string& str) {
     u8string temp;
@@ -195,6 +236,15 @@ fs::path homeDirectory() {
     struct passwd* pw = getpwuid(getuid());
     return pw->pw_dir;
 #endif
+}
+
+void initializeLogBuffer() {
+    shared_ptr<tlog::IOutput> output = logBufferOutput();
+    tlog::Logger::global()->addOutput(output);
+}
+
+vector<string> logLines() {
+    return logBufferOutput()->lines();
 }
 
 void toggleConsole() {

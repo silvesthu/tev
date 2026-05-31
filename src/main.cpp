@@ -17,6 +17,7 @@
 #endif
 
 #include <chrono>
+#include <cstdio>
 #include <iostream>
 #include <thread>
 
@@ -36,6 +37,36 @@ namespace tev {
 // on which the GL context is "current".
 static ImageViewer* sImageViewer = nullptr;
 static atomic<bool> imageViewerIsReady = false;
+
+#ifdef _WIN32
+bool isConsoleRequested(const vector<string>& arguments) {
+    for (const auto& argument : arguments) {
+        if (argument == "-c" || argument == "--console") {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void enableConsole() {
+    if (!AttachConsole(ATTACH_PARENT_PROCESS)) {
+        AllocConsole();
+    }
+
+    FILE* stream = nullptr;
+    freopen_s(&stream, "CONIN$", "r", stdin);
+    freopen_s(&stream, "CONOUT$", "w", stdout);
+    freopen_s(&stream, "CONOUT$", "w", stderr);
+
+    SetConsoleCP(CP_UTF8);
+    SetConsoleOutputCP(CP_UTF8);
+
+    cin.clear();
+    cout.clear();
+    cerr.clear();
+}
+#endif
 
 void scheduleToMainThread(const std::function<void()>& fun) {
     if (imageViewerIsReady) {
@@ -143,6 +174,15 @@ void handleIpcPacket(const IpcPacket& packet, const std::shared_ptr<BackgroundIm
 }
 
 int mainFunc(const vector<string>& arguments) {
+#ifdef _WIN32
+    bool consoleRequested = isConsoleRequested(arguments);
+    if (consoleRequested) {
+        enableConsole();
+    }
+#endif
+
+    initializeLogBuffer();
+
     ArgumentParser parser{
         "tev — The EXR Viewer\n"
         "version " TEV_VERSION "\n"
@@ -150,6 +190,15 @@ int mainFunc(const vector<string>& arguments) {
         "tev was developed by Thomas Müller <thomas94@gmx.net>. "
         "Its source code is available under the BSD 3-Clause License at https://tom94.net",
     };
+
+#ifdef _WIN32
+    args::Flag consoleFlag{
+        parser,
+        "CONSOLE",
+        "Enable console logging.",
+        {'c', "console"},
+    };
+#endif
 
     ValueFlag<float> exposureFlag{
         parser,
@@ -294,6 +343,12 @@ int mainFunc(const vector<string>& arguments) {
         cerr << e.what() << endl;
         return -2;
     }
+
+#ifdef _WIN32
+    if (consoleFlag && !consoleRequested) {
+        enableConsole();
+    }
+#endif
 
     if (versionFlag) {
         tlog::none() << "tev — The EXR Viewer\nversion " TEV_VERSION;

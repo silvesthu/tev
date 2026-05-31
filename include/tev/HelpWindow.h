@@ -9,19 +9,28 @@
 
 #include <string>
 
+namespace nanogui {
+class TextArea;
+}
+
 namespace tev {
 
 class HelpWindow : public nanogui::Window {
 public:
     HelpWindow(nanogui::Widget* parent, bool supportsHdr, std::function<void()> closeCallback);
 
+    void draw(NVGcontext* ctx) override;
     bool keyboard_event(int key, int scancode, int action, int modifiers) override;
 
     static std::string COMMAND;
     static std::string ALT;
 
 private:
+    void refreshLog();
+
     std::function<void()> mCloseCallback;
+    nanogui::TextArea* mLogTextArea = nullptr;
+    size_t mDisplayedLogLineCount = static_cast<size_t>(-1);
 };
 
 }

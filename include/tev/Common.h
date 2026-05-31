@@ -347,6 +347,9 @@ std::string errorString(int errorId);
 
 fs::path homeDirectory();
 
+void initializeLogBuffer();
+std::vector<std::string> logLines();
+
 void toggleConsole();
 
 bool shuttingDown();

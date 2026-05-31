@@ -10,6 +10,7 @@
 #include <nanogui/opengl.h>
 #include <nanogui/screen.h>
 #include <nanogui/tabwidget.h>
+#include <nanogui/textarea.h>
 #include <nanogui/vscrollpanel.h>
 #include <nanogui/window.h>
 
@@ -190,14 +191,53 @@ HelpWindow::HelpWindow(Widget* parent, bool supportsHdr, function<void()> closeC
     addLibrary(about, "tinylogger",        "", "Minimal Pretty-Logging Library");
     addLibrary(about, "UTF8-CPP",          "", "Lightweight UTF-8 String Manipulation Library");
 
+    // Log tab
+    Widget* log = new Widget(tabWidget);
+    VScrollPanel* logScrollPanel = new VScrollPanel{log};
+    tabWidget->append_tab("Logs", log);
+
+    mLogTextArea = new TextArea{logScrollPanel};
+    mLogTextArea->set_font("mono");
+    mLogTextArea->set_font_size(16);
+    mLogTextArea->set_padding(8);
+    refreshLog();
+
     // Make the keybindings page as big as is needed to fit the about tab
     perform_layout(screen()->nvg_context());
     scrollPanel->set_fixed_height(about->height() + 12);
+    logScrollPanel->set_fixed_height(about->height() + 12);
 
     tabWidget->set_selected_id(0);
     tabWidget->set_callback([tabWidget] (int id) mutable {
         tabWidget->set_selected_id(id);
     });
+}
+
+void HelpWindow::refreshLog() {
+    if (!mLogTextArea) {
+        return;
+    }
+
+    auto lines = logLines();
+    if (lines.size() == mDisplayedLogLineCount) {
+        return;
+    }
+
+    mLogTextArea->clear();
+    if (lines.empty()) {
+        mLogTextArea->append_line("No log messages.");
+    } else {
+        for (const auto& line : lines) {
+            mLogTextArea->append_line(line);
+        }
+    }
+
+    mDisplayedLogLineCount = lines.size();
+}
+
+void HelpWindow::draw(NVGcontext* ctx) {
+    refreshLog();
+    Window::draw(ctx);
 }
 
 bool HelpWindow::keyboard_event(int key, int scancode, int action, int modifiers) {
