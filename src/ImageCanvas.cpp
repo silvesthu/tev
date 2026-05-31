@@ -1021,7 +1021,12 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
         bool g = it->name().starts_with('G') && (channel_mask & EChannel::ChannelG);
         bool b = it->name().starts_with('B') && (channel_mask & EChannel::ChannelB);
         bool a = it->name().starts_with('A') && (channel_mask & EChannel::ChannelA);
-        if (r || g || b || a) {
+        bool maskable =
+            it->name().starts_with('R') ||
+            it->name().starts_with('G') ||
+            it->name().starts_with('B') ||
+            it->name().starts_with('A');
+        if (!maskable || r || g || b || a) {
             ++it;
         }
         else {
