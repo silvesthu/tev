@@ -211,7 +211,6 @@ include_directories(
     ${ARGS_INCLUDE}
     ${CLIP_INCLUDE}
     ${DIRECTXTEX_INCLUDE}
-    ${FMT_INCLUDE}
     ${GLFW_INCLUDE}
     ${NANOGUI_EXTRA_INCS}
     ${NANOGUI_INCLUDE}

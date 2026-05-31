@@ -327,7 +327,7 @@ int mainFunc(const vector<string>& arguments) {
 
             fs::path imagePath = toPath(imageFile);
             if (!fs::exists(imagePath)) {
-                tlog::error() << fmt::format("Image {} does not exist.", imagePath);
+                tlog::error() << fmt::format("Image {} does not exist.", toString(imagePath));
                 continue;
             }
 
@@ -342,7 +342,7 @@ int mainFunc(const vector<string>& arguments) {
 
                 ipc->sendToPrimaryInstance(packet);
             } catch (const runtime_error& e) {
-                tlog::error() << fmt::format("Unexpected error {}: {}", imagePath, e.what());
+                tlog::error() << fmt::format("Unexpected error {}: {}", toString(imagePath), e.what());
             }
         }
 

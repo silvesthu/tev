@@ -602,7 +602,7 @@ Task<vector<shared_ptr<Image>>> tryLoadImage(int taskPriority, fs::path path, is
         auto start = chrono::system_clock::now();
 
         if (!iStream) {
-            throw invalid_argument{fmt::format("Image {} could not be opened.", path)};
+            throw invalid_argument{fmt::format("Image {} could not be opened.", toString(path))};
         }
 
         fs::file_time_type fileLastModified = fs::file_time_type::clock::now();

@@ -821,7 +821,7 @@ void ImageCanvas::saveImage(const fs::path& path) const {
 
     ofstream f{path, ios_base::binary};
     if (!f) {
-        throw invalid_argument{fmt::format("Could not open file {}", path)};
+        throw invalid_argument{fmt::format("Could not open file {}", path.string())};
     }
 
     for (const auto& saver : ImageSaver::getSavers()) {
@@ -851,11 +851,11 @@ void ImageCanvas::saveImage(const fs::path& path) const {
         auto end = chrono::system_clock::now();
         chrono::duration<double> elapsedSeconds = end - start;
 
-        tlog::success() << fmt::format("Saved {} after {:.3f} seconds.", path, elapsedSeconds.count());
+        tlog::success() << fmt::format("Saved {} after {:.3f} seconds.", path.string(), elapsedSeconds.count());
         return;
     }
 
-    throw invalid_argument{fmt::format("No save routine for image type {} found.", path.extension())};
+    throw invalid_argument{fmt::format("No save routine for image type {} found.", path.extension().string())};
 }
 
 shared_ptr<Lazy<shared_ptr<CanvasStatistics>>> ImageCanvas::canvasStatistics() {

@@ -2290,8 +2290,9 @@ void ImageViewer::updateTitle() {
         transform(begin(channelTails), end(channelTails), begin(channelTails), Channel::tail);
 
         caption = fmt::format(
-            "{} – {} – {}%",
+            "{} – {} – {} – {}%",
             mCurrentImage->shortName(),
+            mCurrentImage->format(),
             mCurrentGroup,
             (int)std::round(mImageCanvas->scale() * 100)
         );

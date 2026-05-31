@@ -3,9 +3,6 @@
 
 #pragma once
 
-#define FMT_HEADER_ONLY 1
-#include <fmt/core.h>
-
 #include <nanogui/vector.h>
 
 #include <tinylogger/tinylogger.h>
@@ -18,6 +15,12 @@
 #include <sstream>
 #include <unordered_set>
 #include <vector>
+#include <format>
+
+namespace fmt
+{
+    using std::format;
+}
 
 #ifdef _WIN32
 #   define NOMINMAX
@@ -51,15 +54,6 @@
 #ifndef TEV_VERSION
 #   define TEV_VERSION "undefined"
 #endif
-
-// Make std::filesystem::path formattable.
-template <>
-struct fmt::formatter<std::filesystem::path>: formatter<std::string_view> {
-    template <typename FormatContext>
-    auto format(const std::filesystem::path& path, FormatContext& ctx) {
-        return formatter<std::string_view>::format(path.string(), ctx);
-    }
-};
 
 struct NVGcontext;
 
