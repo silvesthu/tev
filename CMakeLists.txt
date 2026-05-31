@@ -191,6 +191,14 @@ endif()
 
 add_executable(tev ${TEV_SOURCES})
 
+if (WIN32)
+    set_target_properties(tev PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()
+
+if (MSVC)
+    target_link_options(tev PRIVATE /ENTRY:wmainCRTStartup)
+endif()
+
 if (APPLE)
     set(RESOURCE_FILES
         resources/icon.icns
