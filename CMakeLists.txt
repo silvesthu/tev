@@ -165,6 +165,7 @@ set(TEV_SOURCES
     include/tev/Channel.h src/Channel.cpp
     include/tev/Common.h src/Common.cpp
     include/tev/FalseColor.h src/FalseColor.cpp
+    include/tev/FlipMetric.h
     include/tev/HelpWindow.h src/HelpWindow.cpp
     include/tev/Image.h src/Image.cpp
     include/tev/ImageButton.h src/ImageButton.cpp
@@ -187,6 +188,58 @@ if (MSVC)
     set(TEV_SOURCES ${TEV_SOURCES} include/tev/imageio/DdsImageLoader.h src/imageio/DdsImageLoader.cpp)
 elseif (APPLE)
     set(TEV_SOURCES ${TEV_SOURCES} resources/icon.icns scripts/mac-run-tev.sh)
+endif()
+
+option(TEV_ENABLE_CUDA_FLIP "Use CUDA for FLIP when a CUDA compiler and device are available" ON)
+set(TEV_FLIP_CUDA_ARCHITECTURES "" CACHE STRING
+    "Optional CUDA architectures for FLIP; empty uses the CMake/toolchain default"
+)
+
+set(TEV_FLIP_SOURCES src/FlipMetric.cpp)
+set(TEV_FLIP_CUDA_ENABLED OFF)
+if (TEV_ENABLE_CUDA_FLIP AND WIN32)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if (CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+        list(APPEND TEV_FLIP_SOURCES src/FlipMetricCudaLoader.cpp src/FlipMetricCuda.cu)
+        set(TEV_FLIP_CUDA_ENABLED ON)
+        message(STATUS "FLIP CUDA backend enabled: ${CMAKE_CUDA_COMPILER}")
+    else()
+        message(STATUS "CUDA compiler not found; FLIP will use the CPU/OpenMP backend")
+    endif()
+elseif (TEV_ENABLE_CUDA_FLIP)
+    message(STATUS "The optional FLIP CUDA backend currently supports Windows; using CPU/OpenMP")
+endif()
+
+add_library(tev_flip_metric STATIC ${TEV_FLIP_SOURCES})
+target_include_directories(tev_flip_metric
+    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    PRIVATE "${FLIP_INCLUDE}" "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+find_package(OpenMP)
+if (TARGET OpenMP::OpenMP_CXX)
+    target_link_libraries(tev_flip_metric PRIVATE OpenMP::OpenMP_CXX)
+endif()
+
+if (TEV_FLIP_CUDA_ENABLED)
+    target_compile_definitions(tev_flip_metric PRIVATE TEV_FLIP_HAS_CUDA=1)
+    set_target_properties(tev_flip_metric PROPERTIES
+        CUDA_STANDARD 20
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_RUNTIME_LIBRARY Static
+    )
+    if (TEV_FLIP_CUDA_ARCHITECTURES)
+        set_property(TARGET tev_flip_metric PROPERTY CUDA_ARCHITECTURES
+            "${TEV_FLIP_CUDA_ARCHITECTURES}"
+        )
+    endif()
+    if (MSVC)
+        target_compile_options(tev_flip_metric PRIVATE
+            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:-Xcompiler=/MTd>"
+            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<NOT:$<CONFIG:Debug>>>:-Xcompiler=/MT>"
+        )
+    endif()
 endif()
 
 add_executable(tev ${TEV_SOURCES})
@@ -219,6 +272,7 @@ include_directories(
     ${ARGS_INCLUDE}
     ${CLIP_INCLUDE}
     ${DIRECTXTEX_INCLUDE}
+    ${FLIP_INCLUDE}
     ${GLFW_INCLUDE}
     ${NANOGUI_EXTRA_INCS}
     ${NANOGUI_INCLUDE}
@@ -243,7 +297,32 @@ endif()
 
 add_definitions(${TEV_DEFINITIONS} ${NANOGUI_EXTRA_DEFS})
 
-target_link_libraries(tev ${TEV_LIBS})
+target_link_libraries(tev ${TEV_LIBS} tev_flip_metric)
+
+include(CTest)
+set(TEV_FLIP_REFERENCE_DIR "" CACHE PATH "Optional NVLabs FLIP images directory for parity testing")
+if (BUILD_TESTING)
+    add_executable(tev_flip_metric_test tests/FlipMetricTest.cpp)
+    target_include_directories(tev_flip_metric_test PRIVATE ${STB_INCLUDE})
+    target_link_libraries(tev_flip_metric_test PRIVATE tev_flip_metric)
+    add_test(NAME tev_flip_metric_synthetic COMMAND tev_flip_metric_test)
+    if (TEV_FLIP_CUDA_ENABLED)
+        add_test(NAME tev_flip_metric_cuda_runtime_fallback COMMAND tev_flip_metric_test)
+        set_tests_properties(tev_flip_metric_cuda_runtime_fallback PROPERTIES
+            ENVIRONMENT "CUDA_VISIBLE_DEVICES=-1"
+        )
+    endif()
+
+    if (EXISTS "${TEV_FLIP_REFERENCE_DIR}/reference.png" AND EXISTS "${TEV_FLIP_REFERENCE_DIR}/test.png")
+        add_test(
+            NAME tev_flip_metric_nv_reference
+            COMMAND tev_flip_metric_test
+                "${TEV_FLIP_REFERENCE_DIR}/reference.png"
+                "${TEV_FLIP_REFERENCE_DIR}/test.png"
+                0.159691
+        )
+    endif()
+endif()
 
 set(CPACK_PACKAGE_VENDOR "Tom94 (Thomas Müller)")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Image viewer and comparison tool for graphics people.")

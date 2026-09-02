@@ -13,9 +13,11 @@
 #include <nanogui/vector.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <fstream>
 #include <numeric>
+#include <optional>
 #include <set>
 
 using namespace nanogui;
@@ -45,6 +47,94 @@ static void applyHistogramChannelMask(vector<Channel>& channels, EChannel channe
             it = channels.erase(it);
         }
     }
+}
+
+static bool isHdrFlipImage(const Image& image) {
+    const string extension = toLower(image.path().extension().string());
+    return extension == ".exr" || extension == ".hdr" || extension == ".pfm";
+}
+
+FlipMetricResult ImageCanvas::computeFlipMetricForImages(
+    const Image& image,
+    const Image& reference,
+    const string& requestedChannelGroup
+) {
+    auto channelNames = image.channelsInGroup(requestedChannelGroup);
+    if (channelNames.empty()) {
+        throw invalid_argument{"FLIP requires a non-empty channel group."};
+    }
+    while (channelNames.size() < 3) {
+        channelNames.emplace_back(channelNames.back());
+    }
+    channelNames.resize(3);
+
+    array<const Channel*, 3> imageChannels{};
+    array<const Channel*, 3> referenceChannels{};
+    for (size_t i = 0; i < imageChannels.size(); ++i) {
+        imageChannels[i] = image.channel(channelNames[i]);
+        referenceChannels[i] = reference.channel(channelNames[i]);
+        if (!referenceChannels[i]) {
+            referenceChannels[i] = reference.channel(channelNames[i], Channel::looseMatch);
+        }
+        if (!imageChannels[i]) {
+            throw invalid_argument{fmt::format("FLIP could not find image channel '{}'.", channelNames[i])};
+        }
+    }
+
+    const Vector2i size = image.size();
+    const Vector2i referenceOffset = (reference.size() - size) / 2;
+    const size_t numPixels = static_cast<size_t>(size.x()) * size.y();
+    vector<float> imageRgb(numPixels * 3);
+    vector<float> referenceRgb(numPixels * 3);
+
+    bool useHdr = isHdrFlipImage(image) || isHdrFlipImage(reference);
+    for (int y = 0; y < size.y(); ++y) {
+        for (int x = 0; x < size.x(); ++x) {
+            const size_t pixel = static_cast<size_t>(x + y * size.x());
+            for (size_t channel = 0; channel < 3; ++channel) {
+                const float imageValue = BitCastTypeToFloat(
+                    imageChannels[channel]->eval({x, y}), image.bitCastType()
+                );
+                const float referenceValue = referenceChannels[channel] ? BitCastTypeToFloat(
+                    referenceChannels[channel]->eval({x + referenceOffset.x(), y + referenceOffset.y()}),
+                    reference.bitCastType()
+                ) : 0.0f;
+                imageRgb[pixel * 3 + channel] = imageValue;
+                referenceRgb[pixel * 3 + channel] = referenceValue;
+                useHdr |= imageValue < 0.0f || imageValue > 1.0f || referenceValue < 0.0f || referenceValue > 1.0f;
+            }
+        }
+    }
+
+    return computeFlipMetric(referenceRgb, imageRgb, size.x(), size.y(), useHdr);
+}
+
+shared_ptr<Image> ImageCanvas::flipDisplayImage(const string& key, const CanvasStatistics& statistics) {
+    auto existing = mFlipDisplayImages.find(key);
+    if (existing != mFlipDisplayImages.end()) {
+        return existing->second;
+    }
+
+    ImageData data;
+    data.format = "FLIP";
+    data.channels.emplace_back("R", mImage->size());
+    data.channels.emplace_back("G", mImage->size());
+    data.channels.emplace_back("B", mImage->size());
+    for (size_t pixel = 0; pixel < statistics.flipErrorMap.size(); ++pixel) {
+        for (size_t channel = 0; channel < 3; ++channel) {
+            data.channels[channel].at(pixel) = statistics.flipMagmaMapSrgb[pixel * 3 + channel];
+        }
+    }
+    data.layers.emplace_back("");
+    data.hasPremultipliedAlpha = false;
+    data.bitCastType = EBitCastType::Float;
+    data.sRGB = true;
+    data.dataWindow = mImage->dataWindow();
+    data.displayWindow = mImage->displayWindow();
+
+    auto result = make_shared<Image>(mImage->path(), mImage->fileLastModified(), std::move(data), "");
+    mFlipDisplayImages.emplace(key, result);
+    return result;
 }
 
 ImageCanvas::ImageCanvas(Widget* parent, float pixelRatio)
@@ -82,6 +172,50 @@ void ImageCanvas::draw_contents() {
         mShader->draw(
             2.0f * inverse(Vector2f{m_size}) / mPixelRatio,
             Vector2f{20.0f}
+        );
+        return;
+    }
+
+    if (mReference && mMetric == EMetric::FLIP && !altHeld && !ctrlHeld) {
+        const string channels = join(mImage->channelsInGroup(mRequestedChannelGroup), ",");
+        const string key = fmt::format("{}-{}-{}-{}", mImage->id(), channels, mReference->id(), (int)mMetric);
+        auto lazyStatistics = canvasStatistics();
+        if (lazyStatistics && lazyStatistics->isReady()) {
+            auto statistics = lazyStatistics->get();
+            if (statistics->hasFlipError
+                && statistics->flipErrorMap.size() == mImage->numPixels()
+                && statistics->flipMagmaMapSrgb.size() == mImage->numPixels() * 3) {
+                auto flipImage = flipDisplayImage(key, *statistics);
+                mShader->draw(
+                    2.0f * inverse(Vector2f{m_size}) / mPixelRatio,
+                    Vector2f{20.0f},
+                    flipImage->texture(vector<string>{"R", "G", "B"}),
+                    inverse(transform(flipImage.get())),
+                    0.0f,
+                    0.0f,
+                    1.0f,
+                    false,
+                    ETonemap::Gamma,
+                    EChannel::ChannelRGB,
+                    Vector2f{0.0f, 1.0f}
+                );
+                return;
+            }
+        }
+
+        // Keep the selected image visible while the full-image FLIP computation is running.
+        mShader->draw(
+            2.0f * inverse(Vector2f{m_size}) / mPixelRatio,
+            Vector2f{20.0f},
+            mImage->texture(mRequestedChannelGroup),
+            inverse(transform(mImage.get())),
+            mExposure,
+            mOffset,
+            mGamma,
+            mClipToLdr,
+            mTonemap,
+            mChannel,
+            mMinMax
         );
         return;
     }
@@ -619,6 +753,26 @@ void ImageCanvas::getValuesAtNanoPos(Vector2i nanoPos, vector<float>& result, co
         return;
     }
 
+
+    if (mReference && mMetric == EMetric::FLIP) {
+        float value = 0.0f;
+        auto lazyStatistics = canvasStatistics();
+        if (lazyStatistics && lazyStatistics->isReady()) {
+            auto statistics = lazyStatistics->get();
+            const auto imageCoords = getImageCoords(*mImage, nanoPos);
+            if (statistics->hasFlipError && mImage->contains(imageCoords)) {
+                const size_t pixel = static_cast<size_t>(imageCoords.x() + imageCoords.y() * mImage->size().x());
+                value = statistics->flipErrorMap[pixel];
+            }
+        }
+        result.assign(channels.size(), value);
+#if 1 // [DDS]
+        mNanoPos = nanoPos;
+        mValuesAtNanoPos = result;
+#endif // [DDS]
+        return;
+    }
+
     auto imageCoords = getImageCoords(*mImage, nanoPos);
     for (const auto& channel : channels) {
         const Channel* c = mImage->channel(channel);
@@ -696,6 +850,7 @@ float ImageCanvas::applyMetric(float image, float reference, EMetric metric) {
         case EMetric::SquaredError:          return diff * diff;
         case EMetric::RelativeAbsoluteError: return abs(diff) / (reference + 0.01f);
         case EMetric::RelativeSquaredError:  return diff * diff / (reference * reference + 0.01f);
+        case EMetric::FLIP:                  throw runtime_error{"FLIP cannot be evaluated per pixel."};
         default:
             throw runtime_error{"Invalid metric selected."};
     }
@@ -941,6 +1096,7 @@ shared_ptr<Lazy<shared_ptr<CanvasStatistics>>> ImageCanvas::canvasStatistics() {
 void ImageCanvas::purgeCanvasStatistics(int imageId) {
     for (const auto& key : mImageIdToCanvasStatisticsKey[imageId]) {
         mCanvasStatistics.erase(key);
+        mFlipDisplayImages.erase(key);
     }
 
     mImageIdToCanvasStatisticsKey.erase(imageId);
@@ -958,6 +1114,20 @@ vector<Channel> ImageCanvas::channelsFromImages(
 ) {
     if (!image) {
         return {};
+    }
+
+    if (reference && metric == EMetric::FLIP) {
+        const auto flip = computeFlipMetricForImages(*image, *reference, requestedChannelGroup);
+        vector<Channel> result;
+        result.emplace_back("R", image->size());
+        result.emplace_back("G", image->size());
+        result.emplace_back("B", image->size());
+        for (size_t i = 0; i < flip.errorMap.size(); ++i) {
+            for (auto& channel : result) {
+                channel.at(i) = flip.errorMap[i];
+            }
+        }
+        return result;
     }
 
 #if 1 // [DDS]
@@ -1030,11 +1200,21 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
     , EChannel channel_mask
 #endif // [DDS]
 ) {
-    auto flattened = channelsFromImages(image, reference, requestedChannelGroup, metric, priority
+    optional<FlipMetricResult> flip;
+    vector<Channel> flattened;
+    if (reference && metric == EMetric::FLIP) {
+        flip = computeFlipMetricForImages(*image, *reference, requestedChannelGroup);
+        flattened.emplace_back("FLIP", image->size());
+        for (size_t i = 0; i < flip->errorMap.size(); ++i) {
+            flattened.front().at(i) = flip->errorMap[i];
+        }
+    } else {
+        flattened = channelsFromImages(image, reference, requestedChannelGroup, metric, priority
 #if 1 // [DDS]
-        , show_srgb
+            , show_srgb
 #endif // [DDS]
-    );
+        );
+    }
 
     float mean = 0;
     float maximum = -numeric_limits<float>::infinity();
@@ -1047,7 +1227,20 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
     auto result = make_shared<CanvasStatistics>();
     result->nChannels = nChannels;
 
-    if (reference && nChannels > 0) {
+    if (flip) {
+        result->hasFlipError = true;
+        result->flipUsesHdr = flip->usesHdr;
+        result->flipMeanError = flip->meanError;
+        result->flipPixelsPerDegree = flip->pixelsPerDegree;
+        result->flipStartExposure = flip->startExposure;
+        result->flipStopExposure = flip->stopExposure;
+        result->flipNumExposures = flip->numExposures;
+        result->flipTonemapper = flip->tonemapper;
+        result->flipErrorMap = std::move(flip->errorMap);
+        result->flipMagmaMapSrgb = std::move(flip->magmaMapSrgb);
+    }
+
+    if (reference && metric != EMetric::FLIP && nChannels > 0) {
         auto squaredErrorChannels = metric == EMetric::SquaredError ? flattened : channelsFromImages(
             image,
             reference,
@@ -1100,6 +1293,8 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
     int nChannels = result->nChannels = alphaChannel ? (int)flattened.size() - 1 : (int)flattened.size();
 #endif // [DDS]
 
+    const EBitCastType statisticsBitCastType = metric == EMetric::FLIP ? EBitCastType::Float : image->bitCastType();
+
 #if 0 // [DDS.UINT]
     for (int i = 0; i < nChannels; ++i) {
         const auto& channel = flattened[i];
@@ -1109,12 +1304,12 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
         minimum = min(minimum, cmin);
     }
 #else
-    if (image->bitCastType() == EBitCastType::UInt)
+    if (statisticsBitCastType == EBitCastType::UInt)
     {
         maximum = bit_cast<float>(numeric_limits<uint32_t>::min());
         minimum = bit_cast<float>(numeric_limits<uint32_t>::max());
     }
-    if (image->bitCastType() == EBitCastType::SInt)
+    if (statisticsBitCastType == EBitCastType::SInt)
     {
         maximum = bit_cast<float>(numeric_limits<int32_t>::min());
         minimum = bit_cast<float>(numeric_limits<int32_t>::max());
@@ -1122,14 +1317,14 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
 
     for (int i = 0; i < nChannels; ++i) {
         const auto& channel = flattened[i];
-        if (image->bitCastType() == EBitCastType::UInt)
+        if (statisticsBitCastType == EBitCastType::UInt)
         {
             auto [cmin, cmax, cmean] = channel.minMaxMean<uint32_t>();
             mean += cmean;
             maximum = bit_cast<float>(std::max(bit_cast<uint32_t>(maximum), cmax));
             minimum = bit_cast<float>(std::min(bit_cast<uint32_t>(minimum), cmin));
         }
-        else if (image->bitCastType() == EBitCastType::SInt)
+        else if (statisticsBitCastType == EBitCastType::SInt)
         {
             auto [cmin, cmax, cmean] = channel.minMaxMean<int32_t>();
             mean += cmean;
@@ -1152,8 +1347,8 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
 
 #if 1 // [DDS.UINT]
     // Calculate histogram with float
-    minimum = BitCastTypeToFloat(minimum, image->bitCastType());
-    maximum = BitCastTypeToFloat(maximum, image->bitCastType());
+    minimum = BitCastTypeToFloat(minimum, statisticsBitCastType);
+    maximum = BitCastTypeToFloat(maximum, statisticsBitCastType);
 #endif // [DDS.UINT]
 
     // Now that we know the maximum and minimum value we can define our histogram bin size.
@@ -1197,7 +1392,7 @@ Task<shared_ptr<CanvasStatistics>> ImageCanvas::computeCanvasStatistics(
         tasks.emplace_back(
             ThreadPool::global().parallelForAsync<size_t>(0, numPixels, [&, i](size_t j) {
 #if 1 // [DDS.UInt]
-                indices[j + i * numPixels] = valToBin(BitCastTypeToFloat(channel.eval(j), image->bitCastType()));
+                indices[j + i * numPixels] = valToBin(BitCastTypeToFloat(channel.eval(j), statisticsBitCastType));
 #else
                 indices[j + i * numPixels] = valToBin(channel.eval(j));
 #endif // decodeHistogramValue

@@ -265,6 +265,7 @@ int mainFunc(const vector<string>& arguments) {
         "SE  - Squared Error\n"
         "RAE - Relative Absolute Error\n"
         "RSE - Relative Squared Error\n"
+        "FLIP - NVIDIA FLIP perceptual error\n"
         "Default is E.",
         {'m', "metric"},
     };

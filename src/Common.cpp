@@ -300,6 +300,8 @@ EMetric toMetric(string name) {
         return RelativeAbsoluteError;
     } else if (name == "RSE") {
         return RelativeSquaredError;
+    } else if (name == "FLIP") {
+        return FLIP;
     } else {
         return Error;
     }

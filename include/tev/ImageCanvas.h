@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <tev/FlipMetric.h>
 #include <tev/UberShader.h>
 #include <tev/Image.h>
 #include <tev/Lazy.h>
@@ -23,6 +24,16 @@ struct CanvasStatistics {
     int nChannels;
     int histogramZero;
     bool hasErrorMetrics = false;
+    bool hasFlipError = false;
+    bool flipUsesHdr = false;
+    float flipMeanError = 0.0f;
+    float flipPixelsPerDegree = 0.0f;
+    float flipStartExposure = 0.0f;
+    float flipStopExposure = 0.0f;
+    int flipNumExposures = 0;
+    std::string flipTonemapper;
+    std::vector<float> flipErrorMap;
+    std::vector<float> flipMagmaMapSrgb;
 };
 
 class ImageCanvas : public nanogui::Canvas {
@@ -178,6 +189,17 @@ public:
     void purgeCanvasStatistics(int imageId);
 
 private:
+    static FlipMetricResult computeFlipMetricForImages(
+        const Image& image,
+        const Image& reference,
+        const std::string& requestedChannelGroup
+    );
+
+    std::shared_ptr<Image> flipDisplayImage(
+        const std::string& key,
+        const CanvasStatistics& statistics
+    );
+
     static std::vector<Channel> channelsFromImages(
         std::shared_ptr<Image> image,
         std::shared_ptr<Image> reference,
@@ -249,6 +271,7 @@ private:
 
     std::map<std::string, std::shared_ptr<Lazy<std::shared_ptr<CanvasStatistics>>>> mCanvasStatistics;
     std::map<int, std::vector<std::string>> mImageIdToCanvasStatisticsKey;
+    std::map<std::string, std::shared_ptr<Image>> mFlipDisplayImages;
 };
 
 }

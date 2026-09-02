@@ -268,7 +268,7 @@ ImageViewer::ImageViewer(
     // Error metrics
     {
         mMetricButtonContainer = new Widget{mSidebarLayout};
-        mMetricButtonContainer->set_layout(new GridLayout{Orientation::Horizontal, 5, Alignment::Fill, 5, 2});
+        mMetricButtonContainer->set_layout(new GridLayout{Orientation::Horizontal, 6, Alignment::Fill, 5, 1});
 
         auto makeMetricButton = [&](const string& name, function<void()> callback) {
             auto button = new Button{mMetricButtonContainer, name};
@@ -283,6 +283,7 @@ ImageViewer::ImageViewer(
         makeMetricButton("SE",  [this]() { setMetric(EMetric::SquaredError); });
         makeMetricButton("RAE", [this]() { setMetric(EMetric::RelativeAbsoluteError); });
         makeMetricButton("RSE", [this]() { setMetric(EMetric::RelativeSquaredError); });
+        makeMetricButton("FL",  [this]() { setMetric(EMetric::FLIP); });
 
         setMetric(EMetric::AbsoluteError);
 
@@ -303,7 +304,10 @@ ImageViewer::ImageViewer(
             "|i - r| / (r + 0.01)\n\n"
 
             "RSE (Relative Squared Error)\n"
-            "(i - r)² / (r² + 0.01)"
+            "(i - r)² / (r² + 0.01)\n\n"
+
+            "FLIP (Perceptual Error)\n"
+            "Perceptual error map at the default 67 pixels per degree"
         );
     }
 
@@ -1319,6 +1323,11 @@ void ImageViewer::draw_contents() {
                     "\nMSE: {:.6g}\nPSNR: {:.3f} dB",
                     statistics->meanSquaredError,
                     statistics->peakSignalToNoiseRatio
+                ) : statistics->hasFlipError ? fmt::format(
+                    "\nFLIP: {:.6f} ({}; {:.1f} PPD)",
+                    statistics->flipMeanError,
+                    statistics->flipUsesHdr ? "HDR" : "LDR",
+                    statistics->flipPixelsPerDegree
                 ) : string{})
 #else
             mHistogram->set_tooltip(fmt::format(

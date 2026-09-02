@@ -181,6 +181,7 @@ HelpWindow::HelpWindow(Widget* parent, bool supportsHdr, function<void()> closeC
     addLibrary(about, "args",              "", "Single-Header Argument Parsing Library");
     addLibrary(about, "clip",              "", "Cross-Platform Clipboard Library");
     addLibrary(about, "{fmt}",             "", "Fast & Safe Formatting Library");
+    addLibrary(about, "NVIDIA FLIP",       "", "Perceptual Image Error Metric");
     addLibrary(about, "Glad",              "", "Multi-Language GL Loader-Generator");
     addLibrary(about, "GLFW",              "", "OpenGL Desktop Development Library");
     addLibrary(about, "NanoGUI",           "", "Small GUI Library");
