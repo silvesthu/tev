@@ -1,6 +1,6 @@
 # tev — The EXR Viewer &nbsp;&nbsp; [![build_windows](https://github.com/silvesthu/tev/actions/workflows/build_windows.yml/badge.svg)](https://github.com/silvesthu/tev/actions/workflows/build_windows.yml)
 
-This fork enhances DDS view, only maintenance window build.
+This fork enhances DDS view, only windows build is maintenanced.
 
 ![Screenshot](https://raw.githubusercontent.com/silvesthu/tev/DDS/resources/screenshot.png)
 
