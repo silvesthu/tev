@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <string>
@@ -339,6 +340,26 @@ inline float toLinear(float sRGB, float gamma = 2.4f) {
     } else {
         return pow((sRGB + a) / (1 + a), gamma);
     }
+}
+
+inline uint8_t linearToSrgbByte(float linear) {
+    if (std::isnan(linear)) {
+        return 0;
+    }
+
+    return static_cast<uint8_t>(std::clamp(toSRGB(linear), 0.0f, 1.0f) * 255.0f + 0.5f);
+}
+
+inline float srgbByteToLinear(uint8_t sRGB) {
+    return toLinear(static_cast<float>(sRGB) / 255.0f);
+}
+
+inline uint8_t linearToUnormByte(float value) {
+    if (std::isnan(value)) {
+        return 0;
+    }
+
+    return static_cast<uint8_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f + 0.5f);
 }
 
 int lastError();

@@ -171,6 +171,10 @@ public:
         return mData.format;
     }
 
+    bool hasPremultipliedAlpha() const {
+        return mData.hasPremultipliedAlpha;
+    }
+
 #if 1 // [DDS]
     bool sRGB() const { return mData.sRGB; }
     EBitCastType bitCastType() const { return mData.bitCastType; }

@@ -958,32 +958,18 @@ std::vector<char> ImageCanvas::getLdrImageDataClip() const
     const int priority = std::numeric_limits<int>::max();
 
     auto numPixels = mImage->numPixels();
-    auto floatData = getHdrImageData(false, priority);
+    auto floatData = getHdrImageData(mImage->hasPremultipliedAlpha(), priority);
 
     // Store as LDR image.
     result.resize(floatData.size());
 
     ThreadPool::global().parallelFor<size_t>(0, numPixels, [&](size_t i) {
         size_t start = 4 * i;
-#if 1 // [DDS]
-        // Copy as it is
-#else
-        Vector3f value = applyTonemap({
-            applyExposureAndOffset(floatData[start]),
-            applyExposureAndOffset(floatData[start + 1]),
-            applyExposureAndOffset(floatData[start + 2]),
-            });
         for (int j = 0; j < 3; ++j) {
-            floatData[start + j] = value[j];
+            result[start + j] = static_cast<char>(linearToSrgbByte(floatData[start + j]));
         }
-#endif // [DDS]
-        for (int j = 0; j < 4; ++j) {
-            if (j != 3)
-                result[start + j] = (char)(floatData[start + j] * 255 + 0.5f);
-            else
-                result[start + j] = 0xff; // force max alpha
-        }
-        }, priority);
+        result[start + 3] = static_cast<char>(linearToUnormByte(floatData[start + 3]));
+    }, priority);
 
     return result;
 }
